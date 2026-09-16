@@ -10,6 +10,7 @@
   <li>When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation with one clock cycle (if required to meet timing constraints).</li>
   <li>In general, instructions take two clock cycles, except for load/store branch instructions (three clock cycles) or multiple clock ALU operations (division).</li>
 </ul>
+<p>For Icarus Verilog simulation run "iverilog.bat" in the "xc3s200" folder. For other simulators (e.g. Modelsim, Questasim, Vivado) define XC3S200_TB=1 for the project and locate the files "xc3s200_boot.mem" and "xc3s200_sys.bin" where the simulator expects them!</p>
 <h3>Xilinx Spartan-3 Starter Kit (XC3S200-4FT256) target</h3>
 <code>
     GCC linker script
