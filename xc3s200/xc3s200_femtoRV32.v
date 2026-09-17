@@ -181,7 +181,7 @@ FemtoRV32 #(
    .PC_RESET(32'h00100000),
    .SP_RESET(32'h00100800), // Top of stack (PC_RESET + boot BRAM size)
    .ADDR_WIDTH(AW),
-   .RVM(1),
+   .RVM(0),
    .DELAY_MULTIPLY(0))
 riscv (
     .clk(clk),
@@ -337,10 +337,10 @@ reg [7:0] ssg_disp[0:3]; // ssg_disp[x][7] = dp
 /*============================================================================*/
 initial begin : init_ssg_display
 /*============================================================================*/
-    ssg_disp[0] <= 8'hFF; // All off
-    ssg_disp[1] <= 8'hFF;
-    ssg_disp[2] <= 8'hFF;
-    ssg_disp[3] <= 8'hFF;
+    ssg_disp[0] = 8'hFF; // All off
+    ssg_disp[1] = 8'hFF;
+    ssg_disp[2] = 8'hFF;
+    ssg_disp[3] = 8'hFF;
 end // init_ssg_display
 
 // Seven segment anode driver
@@ -352,7 +352,7 @@ assign SSG_AN_n[3] = ~( ssg_an_sel == 2'd3 );
 // Seven segment decimal point decoder
 assign SSG_DP_n = ssg_disp[ssg_an_sel][7];
 // Seven segment decoder
-assign SSG_n = ssg_disp[ssg_an_sel];
+assign SSG_n = ssg_disp[ssg_an_sel][6:0];
 wire io_ssg_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-3] );
 
 reg [7:0] led_disp = 0;
@@ -388,10 +388,10 @@ always @(posedge clk) begin : mem_io_access
         end
 
         if ( we & io_ssg_sel ) begin
-            if ( mem_io_wmask[0] ) ssg_disp[0] <= mem_io_d_wr[7:0];
-            if ( mem_io_wmask[1] ) ssg_disp[1] <= mem_io_d_wr[15:8];
-            if ( mem_io_wmask[2] ) ssg_disp[2] <= mem_io_d_wr[23:16];
-            if ( mem_io_wmask[3] ) ssg_disp[3] <= mem_io_d_wr[31:24];
+            if ( mem_io_wmask[0] ) ssg_disp[3] <= mem_io_d_wr[7:0];
+            if ( mem_io_wmask[1] ) ssg_disp[2] <= mem_io_d_wr[15:8];
+            if ( mem_io_wmask[2] ) ssg_disp[1] <= mem_io_d_wr[23:16];
+            if ( mem_io_wmask[3] ) ssg_disp[0] <= mem_io_d_wr[31:24];
         end
 
         if ( we & io_led_sel ) begin
