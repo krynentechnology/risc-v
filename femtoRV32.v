@@ -296,6 +296,7 @@ end else begin : RVM0 // Conditional systhesis!
     assign isDivide = 0;
     assign isMultiplyDelayed = 0;
     assign aluBusy = 0;
+    assign aluOut = aluOut_base;
     assign CSR_read = cycles;
 end
 /*============================================================================*/
