@@ -175,13 +175,15 @@ wire [3:0] mem_io_wmask;
 wire [31:0] mem_io_d_wr;
 wire mem_io_rd;
 reg  [31:0] mem_io_d_rd = 0;
+reg  [31:0] mem_boot_d_rd = 0;
+reg  boot_mem_en_i = 0;
 wire we = |mem_io_wmask;
 
 FemtoRV32 #(
    .PC_RESET(32'h00100000),
-   .SP_RESET(32'h00100800), // Top of stack (PC_RESET + boot BRAM size)
+   .SP_RESET(32'h00100000), // Top of stack (SRAM)
    .ADDR_WIDTH(AW),
-   .RVM(0),
+   .RVM(1),
    .DELAY_MULTIPLY(0))
 riscv (
     .clk(clk),
@@ -189,7 +191,7 @@ riscv (
     .mem_addr(mem_io_a),
     .mem_wdata(mem_io_d_wr),
     .mem_wmask(mem_io_wmask),
-    .mem_rdata(mem_io_d_rd),
+    .mem_rdata(boot_mem_en_i ? mem_boot_d_rd : mem_io_d_rd),
     .mem_rstrb(mem_io_rd),
     .mem_rbusy(1'b0),
     .mem_wbusy(1'b0)
@@ -333,6 +335,19 @@ initial begin : init_boot_memory
     end
 end
 
+/*============================================================================*/
+always @(posedge clk) begin : mem_boot_access // Single port block RAM
+/*============================================================================*/
+    boot_mem_en_i <= boot_mem_en;
+
+    if ( boot_mem_en ) begin
+        if ( we && &mem_io_wmask ) begin // Only 32-bit writes!
+            boot_mem[mem_io_a[10:2]] <= mem_io_d_wr;
+        end
+        mem_boot_d_rd <= boot_mem[mem_io_a[10:2]];
+    end
+end // mem_boot_access
+
 reg [7:0] ssg_disp[0:3]; // ssg_disp[x][7] = dp
 /*============================================================================*/
 initial begin : init_ssg_display
@@ -401,23 +416,8 @@ always @(posedge clk) begin : mem_io_access
         mem_io_d_rd <= mem_d_rd;
     end
 
-    if ( boot_mem_en ) begin
-        if ( we ) begin
-            boot_mem[mem_io_a[10:2]] <= {
-                mem_io_wmask[3] ? mem_io_d_wr[31:24] : boot_mem[mem_io_a[10:2]][31:24],
-                mem_io_wmask[2] ? mem_io_d_wr[23:16] : boot_mem[mem_io_a[10:2]][23:16],
-                mem_io_wmask[1] ? mem_io_d_wr[15:8] : boot_mem[mem_io_a[10:2]][15:8],
-                mem_io_wmask[0] ? mem_io_d_wr[7:0] : boot_mem[mem_io_a[10:2]][7:0]};
-        end
-        mem_io_d_rd <= boot_mem[mem_io_a[10:2]];
-    end
-
     if ( !rst_n ) begin
         mem_io_d_rd <= 0;
-        ssg_disp[0] <= 8'hFF; // All off
-        ssg_disp[1] <= 8'hFF;
-        ssg_disp[2] <= 8'hFF;
-        ssg_disp[3] <= 8'hFF;
     end
 end // mem_io_access
 

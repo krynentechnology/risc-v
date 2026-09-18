@@ -14,12 +14,11 @@ MEMORY {
 }
 
 SECTIONS {
-    _stack_top = ORIGIN(BRAM_data) + LENGTH(BRAM_data);
+    _stack_top = ORIGIN(BRAM_data);
 
     .text   : {KEEP(*(.text.boot))
-               KEEP(*(.stack)) /* Start of stack address space */
                *(.text*)}   > BRAM_text
     .rodata : {*(.rodata*)} > BRAM_text
-    .data   : {*(.data*)}   > BRAM_data AT > BRAM_text
-    .bss    : {*(.bss*)}    > BRAM_data
+    .data   : {*(.data*)}   > SRAM
+    .bss    : {*(.bss*)}    > SRAM
 }
