@@ -48,9 +48,10 @@
  *  - The RVM parameter adds multiply-divide instructions.
  *  - When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation
  *    with one clock cycle (if required to meet timing constraints).
- *  - In general, instructions take two clock cycles, except for load/store
- *    branch instructions (three clock cycles) or multiple clock ALU operations
- *    (division).
+ *
+ *  In general, instructions take two clock cycles, except for load/store branch
+ *  instructions (three clock cycles) or multiple clock ALU operations
+ *  (division).
  */
 
 `resetall
