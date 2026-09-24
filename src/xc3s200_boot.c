@@ -48,18 +48,32 @@ void putChar( char* pString ) {
     }
 }
 
+#define UART_RX_VALID_MASK 0x100
+#define UART_TX_READY_MASK 0x400
+#define BTN0_LED_MASK      0x10
+#define XMODEM_READY_MASK  0x10000
+
 typedef void VOID_FUNC();
 VOID_FUNC* const pSysReset = 0;
-char* const pBootMsg = "\rBoot xc3c200, wait for xmodem system binary...\r";
+char* const pBootMsg = "\rBoot xc3c200, wait for xmodem system binary (press BNT0)...\r";
 
 void run() {
     *pSSG = 0x83A3A387; // "boot"
     putChar( pBootMsg ); // Starts with '\r' -> UART_IO PROMPT
 
     // Console sends UART_IO PROMPT after '\r' Carriage Return
-    while ( !( *pUart & 0x400 )); // Uart TX not ready, wait...
+    while ( !( *pUart & UART_TX_READY_MASK )); // Uart TX not ready, wait...
 
-    while ( !( *pUart & 0x10000 )); // Uart XMODEM not ready, wait...
+    unsigned int btn0 = 0;
+
+    do {
+        if ( !btn0 && ( *pLED & BTN0_LED_MASK )) { // BNT0 active
+            if ( *pUart & UART_TX_READY_MASK ) {
+                *pUart = 0x15; // Send NAK to XMODEM transmitter.
+                btn0 = *pLED & BTN0_LED_MASK; // Update BNT0
+            }
+        }
+    } while ( !( *pUart & XMODEM_READY_MASK )); // Uart XMODEM not ready, wait...
 
     volatile unsigned char* pSramByte = 0;
     unsigned int uart;
@@ -67,17 +81,17 @@ void run() {
     do {
         uart = *pUart;
 
-        if (( uart & 0x10100 ) == 0x10100 ) { // Uart RX data valid?
+        if (( uart & ( XMODEM_READY_MASK | UART_RX_VALID_MASK )) == ( XMODEM_READY_MASK | UART_RX_VALID_MASK )) { // Uart RX data valid?
             *pSramByte = (unsigned char)uart;
             pSramByte++;
         }
-    } while ( uart & 0x10000 ); // Uart XMODEM active
+    } while ( uart & XMODEM_READY_MASK ); // Uart XMODEM active
 /*
-    while ( !( *pLED & 0x10 )); // BTN0, wait...
-    
+    while ( !( *pLED & BTN0_LED_MASK )); // BTN0, wait...
+
     pSramByte = 0;
-    putNibble(( *pSramByte ) >> 4 ); 
-    putNibble( *pSramByte ); 
-*/    
+    putNibble(( *pSramByte ) >> 4 );
+    putNibble( *pSramByte );
+*/
     pSysReset(); // Does not return!
 }

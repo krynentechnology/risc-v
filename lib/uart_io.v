@@ -130,7 +130,7 @@ reg [7:0] x_sum = 0;
 reg x_ack_nak = 0;
 
 assign rx_fifo_nz = |rx_count;
-assign uart_io_tx_dr = uart_tx_dr & tx_xon & ~( tx_prompt | tx_space | tx_bs );
+assign uart_io_tx_dr = uart_tx_dr & tx_xon & ~( tx_prompt | tx_space | tx_bs | x_ack_nak );
 
 reg [7:0] prompt [0:TX_PROMPT_SIZE-1];
 
@@ -169,6 +169,7 @@ always @(posedge clk) begin : uart_handler
                     x_error <= 0;
                 end else if (( EOT == uart_rx_d ) || x_error ) begin
                     x_modem <= 0;
+                    x_ack_nak <= 1;
                 end
             end
             default : begin

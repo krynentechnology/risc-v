@@ -132,7 +132,7 @@ pSysReset:
 	.section	.rodata
 	.align	2
 .LC0:
-	.string	"\rBoot xc3c200, wait for xmodem system binary...\r"
+	.string	"\rBoot xc3c200, wait for xmodem system binary (press BNT0)...\r"
 	.section	.srodata
 	.align	2
 	.type	pBootMsg, @object
@@ -162,37 +162,55 @@ run:
 	lw	a5,0(a5)
 	andi	a5,a5,1024
 	beq	a5,zero,.L11
-	nop
+	sw	zero,-20(s0)
+.L13:
+	lw	a5,-20(s0)
+	bne	a5,zero,.L12
+	li	a5,1179648
+	lw	a5,0(a5)
+	andi	a5,a5,16
+	beq	a5,zero,.L12
+	li	a5,1572864
+	lw	a5,0(a5)
+	andi	a5,a5,1024
+	beq	a5,zero,.L12
+	li	a5,1572864
+	li	a4,21
+	sw	a4,0(a5)
+	li	a5,1179648
+	lw	a5,0(a5)
+	andi	a5,a5,16
+	sw	a5,-20(s0)
 .L12:
 	li	a5,1572864
 	lw	a4,0(a5)
 	li	a5,65536
 	and	a5,a4,a5
-	beq	a5,zero,.L12
-	sw	zero,-20(s0)
-.L14:
+	beq	a5,zero,.L13
+	sw	zero,-24(s0)
+.L15:
 	li	a5,1572864
 	lw	a5,0(a5)
-	sw	a5,-24(s0)
-	lw	a4,-24(s0)
+	sw	a5,-28(s0)
+	lw	a4,-28(s0)
 	li	a5,65536
 	addi	a5,a5,256
 	and	a4,a4,a5
 	li	a5,65536
 	addi	a5,a5,256
-	bne	a4,a5,.L13
-	lw	a5,-24(s0)
+	bne	a4,a5,.L14
+	lw	a5,-28(s0)
 	andi	a4,a5,0xff
-	lw	a5,-20(s0)
+	lw	a5,-24(s0)
 	sb	a4,0(a5)
-	lw	a5,-20(s0)
+	lw	a5,-24(s0)
 	addi	a5,a5,1
-	sw	a5,-20(s0)
-.L13:
-	lw	a4,-24(s0)
+	sw	a5,-24(s0)
+.L14:
+	lw	a4,-28(s0)
 	li	a5,65536
 	and	a5,a4,a5
-	bne	a5,zero,.L14
+	bne	a5,zero,.L15
 	li	a5,0
 	jalr	a5
 	nop

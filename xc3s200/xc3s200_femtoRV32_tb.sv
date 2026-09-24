@@ -208,7 +208,7 @@ localparam [7:0] XON = 8'h11; // Transmit ON
 localparam [7:0] XOFF = 8'h13; // Transmit OFF
 localparam [7:0] NAK = 8'h15; // Negative AcKnowlegde
 localparam [7:0] SPACE = 8'h20;
-localparam MSL = 50; // Maximum string length
+localparam MSL = 80; // Maximum string length
 localparam MSLW = clog2( MSL ); // MSL Width
 
 reg [MSL*8:1] tempStr = 0;
