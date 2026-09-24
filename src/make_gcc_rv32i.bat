@@ -18,8 +18,13 @@ if exist xc3s200_boot.c (
 if exist xc3s200_boot.o (
   riscv-none-elf-objcopy.exe -O binary xc3s200_boot.o ..\xc3s200\xc3s200_boot.bin
   riscv-none-elf-objcopy.exe -O verilog xc3s200_boot.o xc3s200_boot.ver
-  if exist ..\bin2hex.exe (
-    ..\bin2hex.exe ..\xc3s200\xc3s200_boot.bin
+  if exist ..\xc3s200\xc3s200_boot.bin (
+    if exist ..\bin\bin2hex.exe (
+      ..\bin\bin2hex.exe ..\xc3s200\xc3s200_boot.bin
+    )
+    if exist ..\bin\bin2init.exe (
+      ..\bin\bin2init.exe ..\xc3s200\xc3s200_boot.bin
+    )
   )
   if exist ..\xc3s200\xc3s200_boot.hex (
     if exist ..\xc3s200\xc3s200_boot.mem (
@@ -36,8 +41,10 @@ if exist xc3s200_sys.c (
 )
 if exist xc3s200_sys.o (
   riscv-none-elf-objcopy.exe -O binary xc3s200_sys.o ..\xc3s200\xc3s200_sys.bin
-  if exist ..\bin2hex.exe (
-    ..\bin2hex.exe ..\xc3s200\xc3s200_sys.bin
+  if exist ..\xc3s200\xc3s200_sys.bin (
+    if exist ..\bin2hex.exe (
+      ..\bin2hex.exe ..\xc3s200\xc3s200_sys.bin
+    )
   )
   if exist ..\xc3s200\xc3s200_sys.hex (
     if exist ..\xc3s200\xc3s200_sys.mem (

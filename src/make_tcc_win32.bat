@@ -10,5 +10,9 @@ if not defined TCC (
   echo run batch file with path to TCC C compiler installed directory
   goto :END
 )
-tcc.exe -I=%TCC%\include -o ..\bin2hex.exe bin2hex.c
+cd..
+if not exist .\bin mkdir bin
+cd .\src
+tcc.exe -I=%TCC%\include -o ..\bin\bin2hex.exe bin2hex.c
+tcc.exe -I=%TCC%\include -o ..\bin\bin2init.exe bin2init.c
 :END

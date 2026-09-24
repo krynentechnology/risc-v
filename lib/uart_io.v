@@ -57,6 +57,7 @@ module uart_io #(
     input  wire uart_tx_dr,
     // XMODEM optional support
     output reg x_modem = 0,
+    output reg x_error = 0,
     output reg [7:0] x_seq = 0
     );
 
@@ -126,7 +127,6 @@ reg tx_space = 0;
 reg tx_xon = 1'b1;
 reg [7:0] x_count = 0;
 reg [7:0] x_sum = 0;
-reg x_error = 0;
 reg x_ack_nak = 0;
 
 assign rx_fifo_nz = |rx_count;

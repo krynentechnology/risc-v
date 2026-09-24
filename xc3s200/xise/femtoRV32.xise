@@ -351,6 +351,7 @@
     <!-- Do not hand-edit this section, as it will be overwritten when the    -->
     <!-- project is analyzed based on files automatically identified as       -->
     <!-- include files.                                                       -->
+    <file xil_pn:name="../xc3s200_boot.init" xil_pn:type="FILE_VERILOG"/>
   </autoManagedFiles>
 
 </project>

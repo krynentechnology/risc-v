@@ -28,12 +28,20 @@ void __attribute__((section (".text.boot"))) _start() {
     asm volatile( "j run" );
 }
 
+volatile unsigned int* const pLED = (unsigned int*)0x120000; // LEDs
 volatile unsigned int* const pSSG = (unsigned int*)0x140000; // Seven Segment Display
 volatile unsigned int* const pUart = (unsigned int*)0x180000; // Read = uart data/status
 
+void putNibble( char nibble ) {
+    while ( !( *pUart & 0x400 )); // Uart TX not ready, wait...
+
+    nibble &= 0x0F;
+    *pUart = ( nibble > 9 ) ? nibble + '7' : nibble + '0';
+}
+
 void putChar( char* pString ) {
     while ( *pString ) {
-        while ( !( *pUart & 0x00000400 )); // Uart TX not ready, wait...
+        while ( !( *pUart & 0x400 )); // Uart TX not ready, wait...
 
         *pUart = *pString;
         pString++;
@@ -64,6 +72,12 @@ void run() {
             pSramByte++;
         }
     } while ( uart & 0x10000 ); // Uart XMODEM active
-
+/*
+    while ( !( *pLED & 0x10 )); // BTN0, wait...
+    
+    pSramByte = 0;
+    putNibble(( *pSramByte ) >> 4 ); 
+    putNibble( *pSramByte ); 
+*/    
     pSysReset(); // Does not return!
 }

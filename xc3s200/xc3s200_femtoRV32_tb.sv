@@ -331,8 +331,8 @@ initial begin
                 end
             end
             while ( j < 128 ) begin // XMODEM frame padding!
-                uart_write( 1, 8'd0 );
-                x_sum = x_sum + 8'd0;
+                uart_write( 1, 8'h1A ); // ^Z, end of file!
+                x_sum = x_sum + 8'h1A;
                 j = j + 1;
             end
             uart_write( 1, x_sum );
