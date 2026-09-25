@@ -17,7 +17,7 @@
  *  License: GPL, v3, as defined and found on www.gnu.org,
  *           https://www.gnu.org/licenses/gpl-3.0.html
  *
- *  Description: RISCV femtoRV32 test bench for Digilent Xilinx Spartan-3
+ *  Description: RISC-V femtoRV32 test bench for Digilent Xilinx Spartan-3
  *               Starter Kit (XC3S200-4FT256).
  */
 

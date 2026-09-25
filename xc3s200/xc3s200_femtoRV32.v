@@ -17,7 +17,7 @@
  *  License: GPL, v3, as defined and found on www.gnu.org,
  *           https://www.gnu.org/licenses/gpl-3.0.html
  *
- *  Description: RISCV femtoRV32 HW setup for Digilent Xilinx Spartan-3
+ *  Description: RISC-V femtoRV32 HW setup for Digilent Xilinx Spartan-3
  *               Starter Kit (XC3S200-4FT256).
  */
 
@@ -178,14 +178,14 @@ wire [31:0] mem_io_d_wr;
 wire mem_io_rd;
 reg  [31:0] mem_io_d_rd = 0;
 
-localparam BMS = 512; // Block RAM
-localparam BMSW = clog2( BMS );
-
 `ifndef XC3S200_TB
 wire [31:0] mem_boot_d_rd;
 `else
 reg  [31:0] mem_boot_d_rd = 0;
 `endif
+localparam BMS = 512; // Block RAM
+localparam BMSW = clog2( BMS );
+
 wire boot_mem_en = ( mem_io_a[AW-1] && ( mem_io_a[AW-2:BMSW+2] == 0 ));
 reg  boot_mem_en_ = 0;
 wire we = |mem_io_wmask;
@@ -284,10 +284,10 @@ DCM_INST(
 
 // RAMB16_S36: Virtex-II/II-Pro, Spartan-3/3E 512 x 32 + 4 Parity bits Single-Port RAM
 RAMB16_S36 #(
-    .INIT(36'h000000000),
-    // Value of output RAM registers at startup
+    .INIT(36'h000000000), // Value of output RAM registers at startup
     .SRVAL(36'h000000000), // Output value upon SSR assertion
     .WRITE_MODE("WRITE_FIRST"), // WRITE_FIRST, READ_FIRST or NO_CHANGE
+// ISE 14.7 synthesis does not initialize boot_mem with $readmemh( "../xc3s200_boot.mem", boot_mem );
 `include "xc3s200_boot.init"
     // The next set of INITP_xx are for the parity bits
     // Address 0 to 127
