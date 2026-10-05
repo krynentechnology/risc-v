@@ -1,0 +1,561 @@
+/**
+ *  Copyright (C) 2026, Kees Krijnen.
+ *
+ *  This program is free software: you can redistribute it and/or modify it
+ *  under the terms of the GNU Lesser General Public License as published by the
+ *  Free Software Foundation, either version 3 of the License, or (at your
+ *  option) any later version.
+ *
+ *  This program is distributed WITHOUT ANY WARRANTY; without even the implied
+ *  warranty of MERCHANTIBILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public License
+ *  along with this program. If not, see <https://www.gnu.org/licenses/> for a
+ *  copy.
+ *
+ *  License: GPL, v3, as defined and found on www.gnu.org,
+ *           https://www.gnu.org/licenses/gpl-3.0.html
+ *
+ *  Description: RISC-V jascRV32 HW setup for Digilent Xilinx Spartan-3
+ *               Starter Kit (XC3S200-4FT256).
+ */
+
+// Dependencies:
+`ifndef XC3S200_TB
+`define JASCRV32_EXT_DP_BRAM
+`endif
+`include "../jascRV32.v"
+// `include "../lib/uart_io.v"
+// `include "uart.xise.v"
+
+`resetall
+`timescale 1ns / 1ps
+`default_nettype none
+
+/*============================================================================*/
+module xc3s200_jascRV32(
+/*============================================================================*/
+    input  wire CLK_50M, // 50Mhz clock
+    input  wire ARST, // BTN3
+    // UART full duplex lines
+    input wire UART_RX, // TTL/RS232
+    output wire UART_TX, // TTL/RS232
+    input wire UART_RX_A, // TTL/RS232
+    output wire UART_TX_A, // TTL/RS232
+    // Buttons
+    input wire [2:0] BTN,
+    // Sliding switches
+    input wire [7:0] SWT,
+    // LEDs, seven segment display
+    output wire [7:0] LED,
+    output wire [3:0] SSG_AN_n, // Active low
+    output wire [6:0] SSG_n, // Active low
+    output wire SSG_DP_n, // Active low
+    // SRAM
+    output wire SRAM_OE_n, // Output inable, 1 = output disabled (Z)
+    output wire SRAM_WE_n, // Write inable, 1 = read
+    output wire [17:0] SRAM_A, // Address outputs
+    inout  wire [15:0] SRAM_IO1, // Data inputs/outputs
+    output wire SRAM_CE1_n, // Chip enable
+    output wire SRAM_LB1_n, // Low byte control
+    output wire SRAM_UB1_n, // High byte control
+    inout  wire [15:0] SRAM_IO2, // Data inputs/outputs
+    output wire SRAM_CE2_n, // Chip enable
+    output wire SRAM_LB2_n, // Low byte control
+    output wire SRAM_UB2_n // High byte control
+    );
+
+/*============================================================================*/
+function integer clog2( input [31:0] value );
+/*============================================================================*/
+    reg [31:0] depth;
+begin
+    clog2 = 1; // Minimum bit width
+    if ( value > 1 ) begin
+        depth = value - 1;
+        clog2 = 0;
+        while ( depth > 0 ) begin
+            depth = depth >> 1;
+            clog2 = clog2 + 1;
+        end
+    end
+end
+endfunction // clog2
+
+/*============================================================================*/
+function [31:0] swap32( input [31:0] value );
+/*============================================================================*/
+begin
+    swap32[7:0] = value[31:24];
+    swap32[15:8] = value[23:16];
+    swap32[23:16] = value[15:8];
+    swap32[31:24] = value[7:0];
+end
+endfunction // swap32
+
+localparam AW = 21; // 1Mb memory and 1Mb I/O space.
+localparam RSTW = 4; // Reset delay shift width
+localparam PC_BITS = 12;
+localparam NR_BITS = 8;
+localparam RX_FIFO = 8;
+
+wire clk;
+wire rst_n;
+reg [RSTW-1:0] rst_delay = 0;
+
+wire [7:0] uart1_rx_d;
+wire uart1_rx_dv;
+wire [7:0] uart1_tx_d;
+wire uart1_tx_dv;
+wire uart1_tx_dr;
+
+uart #(
+    .CLK_FREQ(35000000),
+`ifndef XC3S200_TB
+    .BAUD_RATE(115200),
+`else
+    .BAUD_RATE(7000000), // One fifth of clock frequency for simulation
+`endif
+    .NR_BITS(NR_BITS),
+    .PARITY("NONE"),
+    .STOP_BITS(1))
+uart1(
+    .clk(clk),
+    .rst_n(rst_n),
+    .uart_rx_d(uart1_rx_d),
+    .uart_rx_dv(uart1_rx_dv),
+    .parity_ok(),
+    .uart_tx_d(uart1_tx_d),
+    .uart_tx_dv(uart1_tx_dv),
+    .uart_tx_dr(uart1_tx_dr),
+    .uart_rx(UART_RX),
+    .uart_tx(UART_TX)
+    );
+
+wire [7:0] uart_io_rx_d;
+wire uart_io_rx_dv;
+wire uart_io_rx_dr;
+wire parity_io_ok;
+wire rx_fifo_nz;
+reg  [7:0] uart_io_tx_d = 0;
+reg  uart_io_tx_dv = 0;
+wire uart_io_tx_dr;
+wire x_modem;
+wire x_error;
+wire [7:0] x_seq;
+
+uart_io #(
+    .PROMPT("XC3S>"),
+    .NR_BITS(NR_BITS),
+    .SKIP_SPACE(0),
+    .RX_FIFO(RX_FIFO),
+    .XMODEM(1))
+console (
+    .clk(clk),
+    .rst_n(rst_n),
+    .uart_io_rx_d(uart_io_rx_d),
+    .uart_io_rx_dv(uart_io_rx_dv),
+    .uart_io_rx_dr(uart_io_rx_dr),
+    .parity_io_ok(parity_io_ok),
+    .rx_fifo_nz(rx_fifo_nz),
+    .uart_io_tx_d(uart_io_tx_d),
+    .uart_io_tx_dv(uart_io_tx_dv),
+    .uart_io_tx_dr(uart_io_tx_dr),
+    .uart_rx_d(uart1_rx_d),
+    .uart_rx_dv(uart1_rx_dv),
+    .parity_ok(1'b1),
+    .uart_tx_d(uart1_tx_d),
+    .uart_tx_dv(uart1_tx_dv),
+    .uart_tx_dr(uart1_tx_dr),
+    .x_modem(x_modem),
+    .x_error(x_error),
+    .x_seq(x_seq)
+    );
+
+assign UART_TX_A = UART_RX_A;
+
+wire [AW-1:0] mem_io_a;
+wire [3:0] mem_io_wmask;
+wire [31:0] mem_io_d_wr;
+wire mem_io_rd;
+reg  [31:0] mem_io_d_rd = 0;
+
+`ifndef XC3S200_TB
+wire [31:0] mem_boot_d_rd;
+`else
+reg  [31:0] mem_boot_d_rd = 0;
+`endif
+localparam BMS = 512; // Block RAM
+localparam BMSW = clog2( BMS );
+
+wire boot_mem_en = ( mem_io_a[AW-1] && ( mem_io_a[AW-2:BMSW+2] == 0 ));
+reg  boot_mem_en_ = 0;
+wire we = |mem_io_wmask;
+wire [31:0] sccc;
+
+jascRV32 #(
+   .PC_RESET(32'h00100000),
+   .SP_RESET(32'h00100000), // Top of stack (SRAM)
+   .AW(AW),
+   .RVM(0),
+   .DELAY_MULTIPLY(0))
+riscv (
+    .clk(clk),
+    .rst_n(rst_n),
+    .addr(mem_io_a),
+    .rd_data(boot_mem_en_ ? mem_boot_d_rd : mem_io_d_rd),
+    .rd(mem_io_rd),
+    .wr_data(mem_io_d_wr),
+    .wr_mask(mem_io_wmask),
+    .sccc(sccc),
+    .hold(1'b0),
+    .r0r31_sel(4'd0)
+    );
+
+// SRAM interface (2 x IS61LV25616AL)
+wire [31:0] mem_d_rd;
+assign SRAM_OE_n = we | mem_io_a[AW-1]; // Memory mapped IO!
+assign SRAM_WE_n = ~we | mem_io_a[AW-1];
+assign SRAM_A = mem_io_a[AW-2:2];
+assign mem_d_rd[15:0] = SRAM_IO1;
+assign SRAM_IO1 = SRAM_WE_n ? 16'hZZZZ : mem_io_d_wr[15:0];
+assign SRAM_CE1_n = ~rst_n;
+assign SRAM_LB1_n = ~mem_io_wmask[0] & SRAM_OE_n;
+assign SRAM_UB1_n = ~mem_io_wmask[1] & SRAM_OE_n;
+assign mem_d_rd[31:16] = SRAM_IO2;
+assign SRAM_IO2 = SRAM_WE_n ? 16'hZZZZ : mem_io_d_wr[31:16];
+assign SRAM_CE2_n = ~rst_n;
+assign SRAM_LB2_n = ~mem_io_wmask[2] & SRAM_OE_n;
+assign SRAM_UB2_n = ~mem_io_wmask[3] & SRAM_OE_n;
+
+`ifndef XC3S200_TB
+// Generated by Xilinx Architecture Wizard, written for synthesis tool: XST
+// Period Jitter (unit interval) for block DCM_INST = 0.04 UI
+// Period Jitter (Peak-to-Peak) for block DCM_INST = 0.92 ns
+wire CLKIN_IBUFG;
+wire CLK0_BUF;
+wire CLKFB_IN;
+wire CLKFX_OBUF;
+wire CLKFX_OUT;
+wire LOCKED_OUT;
+
+IBUFG CLKIN_IBUFG_INST(
+    .I(CLK_50M),
+    .O(CLKIN_IBUFG));
+BUFG CLK0_BUFG_INST(
+    .I(CLK0_BUF),
+    .O(CLKFB_IN));
+BUFG CLKFX_BUFG_INST(
+    .I(CLKFX_OBUF),
+    .O(CLKFX_OUT));
+
+DCM #(
+    .CLK_FEEDBACK("1X"),
+    .CLKDV_DIVIDE(2.0),
+    .CLKFX_DIVIDE(10),
+    .CLKFX_MULTIPLY(7), // 35MHz!
+    .CLKIN_DIVIDE_BY_2("FALSE"),
+    .CLKIN_PERIOD(20.000),
+    .CLKOUT_PHASE_SHIFT("NONE"),
+    .DESKEW_ADJUST("SYSTEM_SYNCHRONOUS"),
+    .DFS_FREQUENCY_MODE("LOW"),
+    .DLL_FREQUENCY_MODE("LOW"),
+    .DUTY_CYCLE_CORRECTION("TRUE"),
+    .FACTORY_JF(16'h8080),
+    .PHASE_SHIFT(0),
+    .STARTUP_WAIT("FALSE"))
+DCM_INST(
+    .CLKFB(CLKFB_IN),
+    .CLKIN(CLKIN_IBUFG),
+    .DSSEN(1'b0),
+    .PSCLK(1'b0),
+    .PSEN(1'b0),
+    .PSINCDEC(1'b0),
+    .RST(ARST),
+    .CLKDV(),
+    .CLKFX(CLKFX_OBUF),
+    .CLKFX180(),
+    .CLK0(CLK0_BUF),
+    .CLK2X(),
+    .CLK2X180(),
+    .CLK90(),
+    .CLK180(),
+    .CLK270(),
+    .LOCKED(LOCKED_OUT),
+    .PSDONE(),
+    .STATUS()
+    );
+
+// RAMB16_S36: Virtex-II/II-Pro, Spartan-3/3E 512 x 32 + 4 Parity bits Single-Port RAM
+RAMB16_S36 #(
+    .INIT(36'h000000000), // Value of output RAM registers at startup
+    .SRVAL(36'h000000000), // Output value upon SSR assertion
+    .WRITE_MODE("WRITE_FIRST"), // WRITE_FIRST, READ_FIRST or NO_CHANGE
+// ISE 14.7 synthesis does not initialize boot_mem with $readmemh( "../xc3s200_boot.mem", boot_mem );
+`include "xc3s200_boot.init"
+    // The next set of INITP_xx are for the parity bits
+    // Address 0 to 127
+    .INITP_00(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_01(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 128 to 255
+    .INITP_02(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_03(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 256 to 383
+    .INITP_04(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_05(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 384 to 511
+    .INITP_06(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_07(256'h0000000000000000000000000000000000000000000000000000000000000000))
+boot_mem (
+    .CLK(clk), // Clock
+    .ADDR(mem_io_a[10:2]), // 9-bit Address Input
+    .EN(boot_mem_en), // RAM Enable Input
+    .SSR(&mem_io_wmask), // Synchronous Set/Reset Input
+    .DI(mem_io_d_wr), // 32-bit Data Input
+    .DIP(4'h0), // 4-bit parity Input
+    .WE(&mem_io_wmask), // Write Enable Input
+    .DO(mem_boot_d_rd), // 32-bit Data Output
+    .DOP() // 4-bit parity Output, not connected!
+    );
+
+assign clk = CLKFX_OUT;
+`else // XC3S200_TB defined
+reg  [31:0] boot_mem[0:BMS-1];
+
+integer file;
+integer r;
+integer i;
+reg [31:0] temp;
+/*============================================================================*/
+initial begin : init_boot_memory
+/*============================================================================*/
+    for ( i = 0; i < BMS; i = i + 1 ) boot_mem[i] = 0;
+    file = $fopen( "xc3s200_boot.mem", "r" ); // Open text file!
+    if ( file ) begin
+        $fclose( file );
+        $readmemh( "xc3s200_boot.mem", boot_mem );
+    end else begin
+        file = $fopen( "xc3s200_boot.bin", "rb" ); // Open binary file!
+        if ( file ) begin
+            r = 1;
+            for ( i = 0; ( r && ( i < BMS )); i = i + 1 ) begin
+                r = $fread( temp, file );
+                if ( r ) boot_mem[i] = swap32( temp ); // Little Endian!
+            end
+            $fclose( file );
+        end else begin
+            // Some simulators require files accessed to be placed in their
+            // working (build) directory!
+            $display( "Could not open xc3s200_boot.mem or xc3s200_boot.bin file!" );
+            // Xilinx ISE 14.7 synthesis does not support $fopen and $fread!
+            $readmemh( "xc3s200_boot.mem", boot_mem );
+        end
+    end
+end
+
+/*============================================================================*/
+always @(posedge clk) begin : mem_boot_access // Single port block RAM
+/*============================================================================*/
+    if ( boot_mem_en ) begin
+        if ( &mem_io_wmask ) begin // Only 32-bit writes!
+            boot_mem[mem_io_a[10:2]] <= mem_io_d_wr;
+        end
+        mem_boot_d_rd <= boot_mem[mem_io_a[10:2]];
+    end
+end // mem_boot_access
+
+assign clk = CLK_50M;
+`endif // XC3S200_TB?
+assign rst_n = &rst_delay;
+
+/*============================================================================*/
+always @(posedge clk) begin : synchronized_reset
+/*============================================================================*/
+    rst_delay <= {rst_delay[RSTW-2:0], 1'b1};
+`ifndef XC3S200_TB
+    if ( ~LOCKED_OUT ) rst_delay <= 0;
+`else
+    if ( ARST ) rst_delay <= 0;
+`endif
+end // synchronized_reset
+
+reg [7:0] ssg_disp[0:3]; // ssg_disp[x][7] = dp
+/*============================================================================*/
+initial begin : init_ssg_display
+/*============================================================================*/
+    ssg_disp[0] = 8'hFF; // All off
+    ssg_disp[1] = 8'hFF;
+    ssg_disp[2] = 8'hFF;
+    ssg_disp[3] = 8'hFF;
+end // init_ssg_display
+
+localparam CCW = 13; // Clock count width for seven segment anode driver
+// Seven segment anode driver
+wire [1:0] ssg_an_sel = sccc[CCW-1:CCW-2];
+assign SSG_AN_n[0] = ~( ssg_an_sel == 2'd0 );
+assign SSG_AN_n[1] = ~( ssg_an_sel == 2'd1 );
+assign SSG_AN_n[2] = ~( ssg_an_sel == 2'd2 );
+assign SSG_AN_n[3] = ~( ssg_an_sel == 2'd3 );
+// Seven segment decimal point decoder
+assign SSG_DP_n = ssg_disp[ssg_an_sel][7];
+// Seven segment decoder
+assign SSG_n = ssg_disp[ssg_an_sel][6:0];
+wire io_ssg_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-3] );
+
+reg [7:0] led_disp = 0;
+
+assign LED[0] = x_modem | led_disp[0];
+assign LED[1] = x_error | led_disp[1];
+assign LED[3:2] = led_disp[3:2];
+assign LED[4] = BTN[0] | led_disp[4];
+assign LED[5] = BTN[1] | led_disp[5];
+assign LED[6] = BTN[2] | led_disp[6];
+assign LED[7] = ARST | led_disp[7];
+wire io_led_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-4] );
+
+wire io_uart_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-2] );
+assign uart_io_rx_dr = io_uart_sel & mem_io_rd & uart_io_rx_dv;
+// mem_io_d_rd_uart           [31:24],   [23:17],    [16],   [15:11],          [10],          [9],           [8],        [7:0]
+wire [31:0] mem_io_d_rd_uart = {x_seq, {7{1'b0}}, x_modem, {5{1'b0}}, uart_io_tx_dr, parity_io_ok, uart_io_rx_dv, uart_io_rx_d};
+
+/*============================================================================*/
+always @(posedge clk) begin : mem_io_access
+/*============================================================================*/
+    boot_mem_en_ <= boot_mem_en;
+    uart_io_tx_dv <= 0;
+
+    if ( mem_io_a[AW-1] ) begin
+        mem_io_d_rd <= {{21{1'b0}}, BTN, SWT};
+
+        if ( io_uart_sel ) begin
+            mem_io_d_rd <= {{24{1'b0}}, mem_io_d_rd_uart};
+
+            if ( mem_io_wmask[0] ) begin
+                if ( uart_io_tx_dr && !uart_io_tx_dv ) begin
+                    uart_io_tx_d <= mem_io_d_wr[7:0];
+                    uart_io_tx_dv <= 1;
+                end
+            end
+        end
+
+        if ( io_led_sel ) begin
+            mem_io_d_rd <= {{24{1'b0}}, LED};
+
+            if ( mem_io_wmask[0] ) led_disp <= mem_io_d_wr[7:0];
+        end
+    end else begin
+        mem_io_d_rd <= mem_d_rd;
+    end
+end // mem_io_access
+
+reg [6:0] ssg_hex_disp[0:15];
+/*============================================================================*/
+initial begin : init_hex_seven_segment
+/*============================================================================*/
+    ssg_hex_disp[0]  = 7'b1000000; // '0'
+    ssg_hex_disp[1]  = 7'b1111001; // '1'
+    ssg_hex_disp[2]  = 7'b0100100; // '2'
+    ssg_hex_disp[3]  = 7'b0110000; // '3'
+    ssg_hex_disp[4]  = 7'b0011001; // '4'
+    ssg_hex_disp[5]  = 7'b0010010; // '5'
+    ssg_hex_disp[6]  = 7'b0000010; // '6'
+    ssg_hex_disp[7]  = 7'b1111000; // '7'
+    ssg_hex_disp[8]  = 7'b0000000; // '8'
+    ssg_hex_disp[9]  = 7'b0010000; // '9'
+    ssg_hex_disp[10] = 7'b0001000; // 'A'
+    ssg_hex_disp[11] = 7'b0000011; // 'B'
+    ssg_hex_disp[12] = 7'b1000110; // 'C'
+    ssg_hex_disp[13] = 7'b0100001; // 'D'
+    ssg_hex_disp[14] = 7'b0000110; // 'E'
+    ssg_hex_disp[15] = 7'b0001110; // 'F'
+end // init_hex_seven_segment
+
+/*============================================================================*/
+always @(posedge clk) begin : ssg_display
+/*============================================================================*/
+    if ( we & io_ssg_sel ) begin
+        if ( mem_io_wmask[0] ) ssg_disp[3] <= mem_io_d_wr[7:0];
+        if ( mem_io_wmask[1] ) ssg_disp[2] <= mem_io_d_wr[15:8];
+        if ( mem_io_wmask[2] ) ssg_disp[1] <= mem_io_d_wr[23:16];
+        if ( mem_io_wmask[3] ) ssg_disp[0] <= mem_io_d_wr[31:24];
+    end else if ( uart1_rx_dv ) begin
+        ssg_disp[1] <= ssg_disp[3];
+        ssg_disp[0] <= ssg_disp[2];
+        ssg_disp[3] <= {1'b1, ssg_hex_disp[uart1_rx_d[3:0]]};
+        ssg_disp[2] <= {1'b1, ssg_hex_disp[uart1_rx_d[7:4]]};
+    end
+end // ssg_display
+
+endmodule  // xc3s200_femtoRV32
+
+`ifndef XC3S200_TB
+/*============================================================================*/
+module dp_bram #( // Dual Port Block RAM
+/*============================================================================*/
+    parameter AW = 9, // Address Width
+    parameter DW = 32, // Data Width
+    parameter BRAMMEM = "" ) // BRAM initialization
+    (
+    input  wire clk_a,
+    input  wire en_a,
+    input  wire we_a,
+    input  wire [AW-1:0] addr_a,
+    input  wire [DW-1:0] data_ai,
+    output wire [DW-1:0] data_ao,
+    input  wire clk_b,
+    input  wire en_b,
+    input  wire we_b,
+    input  wire [AW-1:0] addr_b,
+    input  wire [DW-1:0] data_bi,
+    output wire [DW-1:0] data_bo
+    );
+
+// RAMB16_S36_S36: Virtex-II/II-Pro, Spartan-3/3E 512 x 32 + 4 Parity bits Dual-Port RAM
+RAMB16_S36_S36 #(
+    .INIT_A(36'h000000000), // Value of output RAM registers on Port A at startup
+    .INIT_B(36'h000000000), // Value of output RAM registers on Port B at startup
+    .SRVAL_A(36'h000000000), // Port A output value upon SSR assertion
+    .SRVAL_B(36'h000000000), // Port B output value upon SSR assertion
+    .WRITE_MODE_A("WRITE_FIRST"), // WRITE_FIRST, READ_FIRST or NO_CHANGE
+    .WRITE_MODE_B("WRITE_FIRST"), // WRITE_FIRST, READ_FIRST or NO_CHANGE
+    .SIM_COLLISION_CHECK("ALL"), // "NONE", "WARNING_ONLY", "GENERATE_X_ONLY", "ALL"
+// ISE 14.7 synthesis does not initialize bram with $readmemh( "../xc3s200_r0r31set.mem", bram );
+`include "xc3s200_r0r31set.init"
+    // The next set of INITP_xx are for the parity bits
+    // Address 0 to 127
+    .INITP_00(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_01(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 128 to 255
+    .INITP_02(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_03(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 256 to 383
+    .INITP_04(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_05(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    // Address 384 to 511
+    .INITP_06(256'h0000000000000000000000000000000000000000000000000000000000000000),
+    .INITP_07(256'h0000000000000000000000000000000000000000000000000000000000000000)
+    )
+bram (
+    .CLKA(clk_a), // Port A Clock
+    .ENA(en_a), // Port A RAM Enable Input
+    .WEA(we_a), // Port A Write Enable Input
+    .SSRA(we_a), // Port A Synchronous Set/Reset Input
+    .ADDRA(addr_a), // Port A 9-bit Address Input
+    .DIA(data_ai), // Port A 32-bit Data Input
+    .DOA(data_ao), // Port A 32-bit Data Output
+    .DIPA(4'h0), // Port A 4-bit parity Input
+    .DOPA(), // Port A 4-bit Parity Output, not connected!
+    .CLKB(clk_b), // Port B Clock
+    .ENB(en_b), // Port B RAM Enable Input
+    .WEB(we_b), // Port B Write Enable Input
+    .SSRB(we_b), // Port B Synchronous Set/Reset Input
+    .ADDRB(addr_b), // Port B 9-bit Address Input
+    .DIB(data_bi), // Port B 32-bit Data Input
+    .DOB(data_bo), // Port B 32-bit Data Output
+    .DIPB(4'h0), // Port-B 4-bit parity Input
+    .DOPB() // Port B 4-bit Parity Output, not connected!
+    );
+
+endmodule // dp_bram
+`endif

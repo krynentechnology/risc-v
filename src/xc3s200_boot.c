@@ -52,6 +52,7 @@ void putChar( char* pString ) {
 #define UART_TX_READY_MASK 0x400
 #define BTN0_LED_MASK      0x10
 #define XMODEM_READY_MASK  0x10000
+#define BTN0_THRESHOLD     100
 
 typedef void VOID_FUNC();
 VOID_FUNC* const pSysReset = 0;
@@ -64,14 +65,23 @@ void run() {
     // Console sends UART_IO PROMPT after '\r' Carriage Return
     while ( !( *pUart & UART_TX_READY_MASK )); // Uart TX not ready, wait...
 
-    unsigned int btn0 = 0;
+    int btn0 = 0;
+    int nak = 0;
 
     do {
-        if ( !btn0 && ( *pLED & BTN0_LED_MASK )) { // BNT0 active
-            if ( *pUart & UART_TX_READY_MASK ) {
-                *pUart = 0x15; // Send NAK to XMODEM transmitter.
-                btn0 = *pLED & BTN0_LED_MASK; // Update BNT0
+        if ( *pLED & BTN0_LED_MASK ) {
+            if ( btn0 < BTN0_THRESHOLD ) {
+                btn0++;
+            } else if ( !nak ) {
+                if ( *pUart & UART_TX_READY_MASK ) {
+                    *pUart = 0x15; // Send NAK to XMODEM transmitter.
+                    nak = 1;
+                }
             }
+        } else if ( btn0 > 0 ) {
+            btn0--;
+        } else {
+            nak = 0;
         }
     } while ( !( *pUart & XMODEM_READY_MASK )); // Uart XMODEM not ready, wait...
 

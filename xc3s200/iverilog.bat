@@ -17,7 +17,10 @@ if not defined IVERILOG (
     goto :END
   )
 )
+iverilog.exe -Wall -DXC3S200_TB -o xc3s_jascRV32_tb.out -g2009 ..\lib\uart_io.v uart.xise.v xc3s200_jascRV32.v xc3s200_jascRV32_tb.sv
 iverilog.exe -Wall -DXC3S200_TB -o xc3s_femtoRV32_tb.out -g2009 ..\lib\uart_io.v ..\femtoRV32.v uart.xise.v xc3s200_femtoRV32.v xc3s200_femtoRV32_tb.sv
+if exist xc3s_jascRV32_tb.out vvp.exe xc3s_jascRV32_tb.out
+if exist xc3s_jascRV32_tb.out del xc3s_jascRV32_tb.out
 if exist xc3s_femtoRV32_tb.out vvp.exe xc3s_femtoRV32_tb.out
 if exist xc3s_femtoRV32_tb.out del xc3s_femtoRV32_tb.out
 :END

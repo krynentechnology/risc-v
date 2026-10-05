@@ -351,8 +351,8 @@ reg [NB_STATES-1:0] state;
 assign aluWr = state[EXECUTE_bit] & isALU;
 
 wire needToWait = isBranch | isLoad | isMultiplyDelayed | isDivide | isStore;
-wire rdUpdEn = ( ~needToWait & state[EXECUTE_bit] ) |
-               ((( aluBusy_ & ~aluBusy ) | isLoad | isMultiplyDelayed_ ) & state[WAIT_INSTR_bit] );
+wire rdUpdEn = |rdId & (( ~needToWait & state[EXECUTE_bit] ) | // rdId > 0!
+               ((( aluBusy_ & ~aluBusy ) | isLoad | isMultiplyDelayed_ ) & state[WAIT_INSTR_bit] ));
 // The value written back into the destination register.
 wire [31:0] rdUpdate =
     ( isALU            ? aluOut     : 32'b0 ) |  // ALUreg, ALUimm
@@ -366,7 +366,7 @@ wire [31:0] rdUpdate =
 always @(posedge clk) begin : update_registerFile
 /*============================================================================*/
     if ( rdUpdEn ) begin
-        if ( rdId != 0 ) registerFile[rdId] <= rdUpdate;
+        registerFile[rdId] <= rdUpdate;
     end
 end // update_registerFile
 
@@ -407,7 +407,7 @@ always @(posedge clk) begin : state_machine
             isLoad    <= ( mem_rdata[6:2] == 5'b00000 ); // rd <- mem[rs1+Iimm]
             isALUimm  <= ( mem_rdata[6:2] == 5'b00100 ); // rd <- rs1 OP Iimm
             isAUIPC   <= ( mem_rdata[6:2] == 5'b00101 ); // rd <- PC + Uimm
-            isStore   <= ( mem_rdata[6:2] == 5'b01000 ); // rd <- mem[rs1+Iimm]
+            isStore   <= ( mem_rdata[6:2] == 5'b01000 ); // mem[rs1Id+Iimm] <= rs2
             isALUreg  <= ( mem_rdata[6:2] == 5'b01100 ); // rd <- rs1 OP rs2
             isLUI     <= ( mem_rdata[6:2] == 5'b01101 ); // rd <- Uimm
             isBranch  <= ( mem_rdata[6:2] == 5'b11000 ); // if ( rs1 OP rs2 ) PC <- PC + Bimm

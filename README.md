@@ -1,4 +1,17 @@
 # RISC-V
+<h3>JascRV32</h3>
+<p>JascRV32, Just Another Soft Core (Single Cycle) RISC-V 32-bit processor. Inspired by FemtoRV32.</p>
+<ul>
+  <li>Verilog 2001 compliant - <a href="https://github.com/nokyalr/ise-14.7-windows-11">Xilinx ISE 14.7</a> synthesis.</li>
+  <li>RISC-V registers R0-R31 are (synchronous) dual port block ram based.</li>
+  <li>Usage (optionally) multiple R0-R31 register sets to support interrupt, subroutine, thread handling. Four clock cycle context switch. PC stored in / retrieved from R0 during context switch.</li>
+  <li>Reset address can be defined using PC_RESET (default is 0).</li>
+  <li>The SP_RESET parameter sets the stack pointer register (R2). Default zero, when not defined the register R2 could be initialized by programming, otherwise the stack top is located at the end of the address space.</li>
+  <li>The AW parameter sets the internal address bus (and address computation logic).</li>
+  <li>The RVM parameter adds multiply-divide instructions (RV32IM).</li>
+  <li>When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation with one clock cycle (if required to meet timing constraints).</li>
+  <li>In general, instructions take one clock cycle, except for instructions (two clock cycles) following branch/jump/load/store instructions (sets the cpu address bus) or multiple clock ALU operations (division).</li>
+</ul>
 <h3>FemtoRV32</h3>
 <p>The "quark/electron", the most elementary versions of FemtoRV32.</p>
 <ul>
@@ -61,3 +74,5 @@
        .
     }
 </code>
+<p>The XS3S200 RV32I(M) soft core starts from initialized block RAM and waits for the system binary through XMODEM protocol (e.g. <a href="http://www.umonfw.com/ucon/">uCon terminal</a> ).</p>
+<img src="xc3s200/xc3s200_jascRV32.png" width=800>

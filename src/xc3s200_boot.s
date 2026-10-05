@@ -163,54 +163,71 @@ run:
 	andi	a5,a5,1024
 	beq	a5,zero,.L11
 	sw	zero,-20(s0)
-.L13:
-	lw	a5,-20(s0)
-	bne	a5,zero,.L12
+	sw	zero,-24(s0)
+.L16:
 	li	a5,1179648
 	lw	a5,0(a5)
 	andi	a5,a5,16
 	beq	a5,zero,.L12
+	lw	a4,-20(s0)
+	li	a5,99
+	bgt	a4,a5,.L13
+	lw	a5,-20(s0)
+	addi	a5,a5,1
+	sw	a5,-20(s0)
+	j	.L14
+.L13:
+	lw	a5,-24(s0)
+	bne	a5,zero,.L14
 	li	a5,1572864
 	lw	a5,0(a5)
 	andi	a5,a5,1024
-	beq	a5,zero,.L12
+	beq	a5,zero,.L14
 	li	a5,1572864
 	li	a4,21
 	sw	a4,0(a5)
-	li	a5,1179648
-	lw	a5,0(a5)
-	andi	a5,a5,16
-	sw	a5,-20(s0)
+	li	a5,1
+	sw	a5,-24(s0)
+	j	.L14
 .L12:
+	lw	a5,-20(s0)
+	ble	a5,zero,.L15
+	lw	a5,-20(s0)
+	addi	a5,a5,-1
+	sw	a5,-20(s0)
+	j	.L14
+.L15:
+	sw	zero,-24(s0)
+.L14:
 	li	a5,1572864
 	lw	a4,0(a5)
 	li	a5,65536
 	and	a5,a4,a5
-	beq	a5,zero,.L13
-	sw	zero,-24(s0)
-.L15:
+	beq	a5,zero,.L16
+	sw	zero,-28(s0)
+.L18:
 	li	a5,1572864
 	lw	a5,0(a5)
-	sw	a5,-28(s0)
-	lw	a4,-28(s0)
+	sw	a5,-32(s0)
+	lw	a4,-32(s0)
 	li	a5,65536
 	addi	a5,a5,256
 	and	a4,a4,a5
 	li	a5,65536
 	addi	a5,a5,256
-	bne	a4,a5,.L14
-	lw	a5,-28(s0)
+	bne	a4,a5,.L17
+	lw	a5,-32(s0)
 	andi	a4,a5,0xff
-	lw	a5,-24(s0)
+	lw	a5,-28(s0)
 	sb	a4,0(a5)
-	lw	a5,-24(s0)
+	lw	a5,-28(s0)
 	addi	a5,a5,1
-	sw	a5,-24(s0)
-.L14:
-	lw	a4,-28(s0)
+	sw	a5,-28(s0)
+.L17:
+	lw	a4,-32(s0)
 	li	a5,65536
 	and	a5,a4,a5
-	bne	a5,zero,.L15
+	bne	a5,zero,.L18
 	li	a5,0
 	jalr	a5
 	nop
