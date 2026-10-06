@@ -6,7 +6,6 @@
   <li>RISC-V registers R0-R31 are (synchronous) dual port block ram based.</li>
   <li>Usage (optionally) multiple R0-R31 register sets to support interrupt, subroutine, thread handling. Four clock cycle context switch. PC stored in / retrieved from R0 during context switch.</li>
   <li>Reset address can be defined using PC_RESET (default is 0).</li>
-  <li>The SP_RESET parameter sets the stack pointer register (R2). Default zero, when not defined the register R2 could be initialized by programming, otherwise the stack top is located at the end of the address space.</li>
   <li>The AW parameter sets the internal address bus (and address computation logic).</li>
   <li>The RVM parameter adds multiply-divide instructions (RV32IM).</li>
   <li>When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation with one clock cycle (if required to meet timing constraints).</li>
