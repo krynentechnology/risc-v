@@ -341,7 +341,7 @@ wire [31:0] rdUpdate = |rdId ? // rdId > 0
           ( isJAL   | isJALR ? pc_        : 32'b0 ) |  // JAL, JALR (PCplus4)
           ( isLUI            ? Uimm       : 32'b0 ) |  // LUI
           ( isSYSTEM         ? CSR_read   : 32'b0 ))   // SYSTEM
-                                          : {{(32-AW){1'b0}}, PC};
+                                          : {{(32-AW){1'b0}}, pc_ };
 
 wire [31:0] dp_bram_data_ai = isLoad_ ? load_data : isLoad__ ? rdUpdate_ : rdUpdate;
 reg  [3:0] r0r31_set = 0;
@@ -412,7 +412,7 @@ always @(posedge clk) begin : execute
             end
         end
 
-        if ( !zero_cs_ws || ( !isLoad && ( r0r31_set != r0r31_sel ))) begin
+        if ( !zero_cs_ws || ( !( isJump || isLoad ) && ( r0r31_set != r0r31_sel ))) begin
             case ( cs_ws )
             2'd3 : r0r31_set <= r0r31_sel; // Also store PC into R0
             // cs_ws = 2, dp_bram1_data_ao valid next clock cycle
