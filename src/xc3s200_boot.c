@@ -52,7 +52,7 @@ void putChar( char* pString ) {
 #define UART_TX_READY_MASK 0x400
 #define BTN0_LED_MASK      0x10
 #define XMODEM_READY_MASK  0x10000
-#define BTN0_THRESHOLD     100
+#define BTN0_THRESHOLD     25
 
 typedef void VOID_FUNC();
 VOID_FUNC* const pSysReset = 0;

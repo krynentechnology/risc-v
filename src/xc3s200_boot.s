@@ -170,7 +170,7 @@ run:
 	andi	a5,a5,16
 	beq	a5,zero,.L12
 	lw	a4,-20(s0)
-	li	a5,99
+	li	a5,24
 	bgt	a4,a5,.L13
 	lw	a5,-20(s0)
 	addi	a5,a5,1

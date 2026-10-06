@@ -84,11 +84,11 @@ reg  uart2_tx_dv = 0;
 wire uart2_tx_dr;
 
 uart #(
-    .CLK_FREQ(35000000),
+    .CLK_FREQ(30000000),
 `ifndef XC3S200_TB
     .BAUD_RATE(115200),
 `else
-    .BAUD_RATE(7000000), // One fifth of clock frequency for simulation
+    .BAUD_RATE(6000000), // One fifth of clock frequency for simulation
 `endif
     .NR_BITS(NR_BITS),
     .PARITY("NONE"),
@@ -348,6 +348,9 @@ initial begin
     end
     #10000
     wait ( rx1_data == LF ); // JascRV32 xc3s200_sys.c system message should be displayed
+    #1000
+    xc3s200_jascRV32_dut.r0r31_sel = 4'd1; // Context switch!
+    #1000
     $display( "Simulation finished" );
     $finish;
 end

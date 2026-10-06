@@ -111,11 +111,11 @@ wire uart1_tx_dv;
 wire uart1_tx_dr;
 
 uart #(
-    .CLK_FREQ(35000000),
+    .CLK_FREQ(30000000),
 `ifndef XC3S200_TB
     .BAUD_RATE(115200),
 `else
-    .BAUD_RATE(7000000), // One fifth of clock frequency for simulation
+    .BAUD_RATE(6000000), // One fifth of clock frequency for simulation
 `endif
     .NR_BITS(NR_BITS),
     .PARITY("NONE"),
@@ -193,10 +193,10 @@ wire boot_mem_en = ( mem_io_a[AW-1] && ( mem_io_a[AW-2:BMSW+2] == 0 ));
 reg  boot_mem_en_ = 0;
 wire we = |mem_io_wmask;
 wire [31:0] sccc;
+reg  [3:0] r0r31_sel = 0;
 
 jascRV32 #(
    .PC_RESET(32'h00100000),
-   .SP_RESET(32'h00100000), // Top of stack (SRAM)
    .AW(AW),
    .RVM(0),
    .DELAY_MULTIPLY(0))
@@ -210,7 +210,7 @@ riscv (
     .wr_mask(mem_io_wmask),
     .sccc(sccc),
     .hold(1'b0),
-    .r0r31_sel(4'd0)
+    .r0r31_sel(r0r31_sel)
     );
 
 // SRAM interface (2 x IS61LV25616AL)
@@ -254,7 +254,7 @@ DCM #(
     .CLK_FEEDBACK("1X"),
     .CLKDV_DIVIDE(2.0),
     .CLKFX_DIVIDE(10),
-    .CLKFX_MULTIPLY(7), // 35MHz!
+    .CLKFX_MULTIPLY(6), // 30MHz!
     .CLKIN_DIVIDE_BY_2("FALSE"),
     .CLKIN_PERIOD(20.000),
     .CLKOUT_PHASE_SHIFT("NONE"),

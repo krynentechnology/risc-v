@@ -34,14 +34,11 @@
  *               processor. Inspired by FemtoRV32. Differences are:
  *
  *  - Verilog 2001 compliant - ISE 14.7 synthesis
- *  - RISC-V registers R0-R31 are (synchronous) dual port block ram based
+ *  - RISC-V registers R0-R31 are (synchronous) dual port block ram based.
  *  - Usage (optionally) multiple R0-R31 register sets to support interrupt,
  *    subroutine, thread handling. Four clock cycle context switch.
  *    PC stored in / retrieved from R0 during context switch.
  *  - Reset address can be defined using PC_RESET (default is 0).
- *  - The SP_RESET parameter sets the stack pointer register (R2). Default zero,
- *    when not defined the register R2 could be initialized by programming,
- *    otherwise the stack top is located at the end of the address space.
  *  - The AW parameter sets the internal address bus (and address
  *    computation logic).
  *  - The RVM parameter adds multiply-divide instructions.
@@ -61,7 +58,6 @@
 module jascRV32 #( // No inout (bus) interface!
 /*============================================================================*/
     parameter PC_RESET = 32'h00000000, // Program counter reset address
-    parameter SP_RESET = 0, // Stack pointer register (R2) reset address
     parameter [5:0] AW = 24, // S(D)RAM Address Width (32-bit aligned for PC)
     parameter [0:0] RVM = 0, // RISC-V Multiply-divide instruction extension
     parameter [0:0] DELAY_MULTIPLY = 0, // Delay multiply one clock cycle
@@ -416,14 +412,12 @@ always @(posedge clk) begin : execute
             end
         end
 
-        if ( !zero_cs_ws || ( r0r31_set != r0r31_sel )) begin
+        if ( !zero_cs_ws || ( !isLoad && ( r0r31_set != r0r31_sel ))) begin
             case ( cs_ws )
-            2'd3 : begin
-                opcode[31:2] <= {{(25){1'b0}}, 05'b11000}; // isBranch, rdId = 0!
-                r0r31_set <= r0r31_sel; // Also store PC into R0
-            end
+            2'd3 : r0r31_set <= r0r31_sel; // Also store PC into R0
             // cs_ws = 2, dp_bram1_data_ao valid next clock cycle
             2'd1 : PC <= dp_bram1_data_ao[AW-1:0];
+            2'd0 : opcode[11:7] <= 0; // rdId = 0!
             default :;
             endcase
             isStore_ <= 1'b1; // Stop processing opcode!
@@ -433,7 +427,7 @@ always @(posedge clk) begin : execute
 end // execute
 
 wire needToWait = hold | isBranch | isDivide | isJump_ | isLoad | isMultiplyDelayed | isStore | isStore__;
-wire rdUpdEn =  ( |rdId | |cs_ws ) & ( ~needToWait | ( aluBusy_ & ~aluBusy ) | isLoad_ | isMultiplyDelayed_ );
+wire rdUpdEn =  ( |rdId | |cs_ws ) & ( ~needToWait | ( aluBusy_ & ~aluBusy ) | ( cs_ws == 2'd3 ) | isLoad_ | isMultiplyDelayed_ );
 
 dp_bram #(
     .AW(9),
