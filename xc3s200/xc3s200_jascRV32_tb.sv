@@ -349,7 +349,9 @@ initial begin
     #10000
     wait ( rx1_data == LF ); // JascRV32 xc3s200_sys.c system message should be displayed
     #1000
-    xc3s200_jascRV32_dut.r0r31_sel = 4'd1; // Context switch!
+    btn[0] = 1; // Context switch!
+    wait ( xc3s200_jascRV32_dut.r0r31_sel == 1 );
+    btn[0] = 0;
     #1000
     $display( "Simulation finished" );
     $finish;

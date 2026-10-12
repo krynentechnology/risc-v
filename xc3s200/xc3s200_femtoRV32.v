@@ -192,7 +192,6 @@ wire we = |mem_io_wmask;
 
 FemtoRV32 #(
    .PC_RESET(32'h00100000),
-   .SP_RESET(32'h00100000), // Top of stack (SRAM)
    .ADDR_WIDTH(AW),
    .RVM(1),
    .DELAY_MULTIPLY(0))

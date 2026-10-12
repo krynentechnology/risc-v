@@ -37,13 +37,19 @@ if exist xc3s200_boot.o (
   )
 )
 if exist xc3s200_sys.c (
+  if "%1"=="s" (
+    riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -S -o xc3s200_sys.s xc3s200_sys.c
+  )
   riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -nostdlib -ffreestanding -fno-delete-null-pointer-checks -s -Os -Txc3s200_sys.ld -o xc3s200_sys.o xc3s200_sys.c
 )
 if exist xc3s200_sys.o (
   riscv-none-elf-objcopy.exe -O binary xc3s200_sys.o ..\xc3s200\xc3s200_sys.bin
+  if "%1"=="s" (
+    riscv-none-elf-objcopy.exe -O verilog xc3s200_sys.o xc3s200_sys.ver
+  )
   if exist ..\xc3s200\xc3s200_sys.bin (
-    if exist ..\bin2hex.exe (
-      ..\bin2hex.exe ..\xc3s200\xc3s200_sys.bin
+    if exist ..\bin\bin2hex.exe (
+      ..\bin\bin2hex.exe ..\xc3s200\xc3s200_sys.bin
     )
   )
   if exist ..\xc3s200\xc3s200_sys.hex (

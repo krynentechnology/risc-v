@@ -40,9 +40,6 @@
  *  Parameters:
  *
  *  - Reset address can be defined using PC_RESET (default is 0).
- *  - The SP_RESET parameter sets the stack pointer register (R2). Default zero,
- *    when not defined the register R2 could be initialized by programming,
- *    otherwise the stack top is located at the end of the address space.
  *  - The ADDR_WIDTH parameter sets the internal address bus (and address
  *    computation logic).
  *  - The RVM parameter adds multiply-divide instructions.
@@ -67,7 +64,6 @@
 module FemtoRV32 #(
 /*============================================================================*/
     parameter PC_RESET = 0, // Program counter reset address
-    parameter SP_RESET = 0, // Stack pointer register (R2) reset address
     parameter ADDR_WIDTH = 24, // S(D)RAM Address Width (32-bit aligned for PC)
     parameter [0:0] RVM = 0, // RISC-V Multiply-divide instruction extension
     parameter [0:0] DELAY_MULTIPLY = 0 ) // Delay multiply one clock cycle
@@ -331,8 +327,6 @@ reg [5:0] i;
 initial begin : initialize_registers
 /*============================================================================*/
     for ( i = 0; i < 32; i = i + 1 ) registerFile[i] = 0;
-
-    registerFile[2] = SP_RESET; // R2 stack pointer register initialization.
 end // initialize_registers
 
 localparam FETCH_INSTR_bit = 0;

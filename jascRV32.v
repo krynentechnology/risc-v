@@ -168,7 +168,7 @@ wire [31:0] shifter_in = funct3Is[1] ? {
     aluIn1[24], aluIn1[25], aluIn1[26], aluIn1[27], aluIn1[28], aluIn1[29],
     aluIn1[30], aluIn1[31]} : aluIn1;
 
-wire [31:0] shifter = $signed({opcode[30] & aluIn1[31], shifter_in}) >>> aluIn2[4:0];
+wire [31:0] shifter = $signed( {opcode[30] & aluIn1[31], shifter_in} ) >>> aluIn2[4:0];
 
 wire [31:0] leftshift = {
     shifter[0],  shifter[1],  shifter[2],  shifter[3],  shifter[4],
@@ -371,12 +371,12 @@ always @(posedge clk) begin : execute
         // Pulse (single clock clycle) flags for single clock cycle fetch_decode!
         isLoad <= 0;
         isLoad_ <= isLoad;
-        isLoad__ <= isLoad_;
+        isLoad__ <= isLoad_ & ~isStore__; // Adjacent isLoad/isStore affect rdUpdEn!
         isALUimm <= 0;
         isAUIPC <= 0;
         isStore <= 0;
         isStore_ <= isStore;
-        isStore__ <= isStore_;
+        isStore__ <= isStore_ | isLoad_; // Adjacent isLoad/isStore affect rdUpdEn!
         isALUreg <= 0; // isMultiplyDelayed
         isLUI <= 0;
         isBranch <= 0;
@@ -404,7 +404,7 @@ always @(posedge clk) begin : execute
             opcode[31:2] <= rd_data[31:2]; // Bits 0 and 1 are ignored.
         end
 
-        if ( zero_cs_ws ) begin
+        if ( zero_cs_ws && !hold ) begin
              pc_ <= PC_addr;
              pc__ <= pc_;
             if ( !( isLoad | isStore )) begin

@@ -28,7 +28,7 @@ void __attribute__((section (".text.boot"))) _start() {
     asm volatile( "j run" );
 }
 
-volatile unsigned int* const pLED = (unsigned int*)0x120000; // LEDs
+volatile unsigned int* const pLED_R0R31 = (unsigned int*)0x120000; // LEDs, R0R31 set select
 volatile unsigned int* const pSSG = (unsigned int*)0x140000; // Seven Segment Display
 volatile unsigned int* const pUart = (unsigned int*)0x180000; // Read = uart data/status
 
@@ -56,7 +56,7 @@ void putChar( char* pString ) {
 
 typedef void VOID_FUNC();
 VOID_FUNC* const pSysReset = 0;
-char* const pBootMsg = "\rBoot xc3c200, wait for xmodem system binary (press BNT0)...\r";
+char* const pBootMsg = "\rBoot xc3c200, wait for xmodem system binary (press BTN0)...\r";
 
 void run() {
     *pSSG = 0x83A3A387; // "boot"
@@ -69,7 +69,7 @@ void run() {
     int nak = 0;
 
     do {
-        if ( *pLED & BTN0_LED_MASK ) {
+        if ( *pLED_R0R31 & BTN0_LED_MASK ) {
             if ( btn0 < BTN0_THRESHOLD ) {
                 btn0++;
             } else if ( !nak ) {
@@ -97,7 +97,7 @@ void run() {
         }
     } while ( uart & XMODEM_READY_MASK ); // Uart XMODEM active
 /*
-    while ( !( *pLED & BTN0_LED_MASK )); // BTN0, wait...
+    while ( !( *pLED_R0R31 & BTN0_LED_MASK )); // BTN0, wait...
 
     pSramByte = 0;
     putNibble(( *pSramByte ) >> 4 );

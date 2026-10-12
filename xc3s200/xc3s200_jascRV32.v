@@ -193,6 +193,10 @@ wire boot_mem_en = ( mem_io_a[AW-1] && ( mem_io_a[AW-2:BMSW+2] == 0 ));
 reg  boot_mem_en_ = 0;
 wire we = |mem_io_wmask;
 wire [31:0] sccc;
+reg  boot_mem_wr_hold_toggle = 1'b1;
+wire hold_toggle = boot_mem_wr_hold_toggle;
+wire boot_mem_wr_hold = boot_mem_en & |mem_io_wmask & ~( &mem_io_wmask );
+wire hold = boot_mem_wr_hold & hold_toggle;
 reg  [3:0] r0r31_sel = 0;
 
 jascRV32 #(
@@ -311,15 +315,27 @@ boot_mem (
     .CLK(clk), // Clock
     .ADDR(mem_io_a[10:2]), // 9-bit Address Input
     .EN(boot_mem_en), // RAM Enable Input
-    .SSR(&mem_io_wmask), // Synchronous Set/Reset Input
-    .DI(mem_io_d_wr), // 32-bit Data Input
+    .SSR(|mem_io_wmask), // Synchronous Set/Reset Input
+    .DI( { // 32-bit Data Input
+        ( mem_io_wmask[0] ? mem_io_d_wr[7:0] : mem_boot_d_rd[7:0] ),
+        ( mem_io_wmask[1] ? mem_io_d_wr[15:8] : mem_boot_d_rd[15:8] ),
+        ( mem_io_wmask[2] ? mem_io_d_wr[23:16] : mem_boot_d_rd[23:16] ),
+        ( mem_io_wmask[3] ? mem_io_d_wr[31:24] : mem_boot_d_rd[31:24] )} ),
     .DIP(4'h0), // 4-bit parity Input
-    .WE(&mem_io_wmask), // Write Enable Input
+    .WE(|mem_io_wmask), // Write Enable Input
     .DO(mem_boot_d_rd), // 32-bit Data Output
     .DOP() // 4-bit parity Output, not connected!
     );
 
 assign clk = CLKFX_OUT;
+
+/*============================================================================*/
+always @(posedge clk) begin : mem_boot_access // Single port block RAM
+/*============================================================================*/
+    boot_mem_wr_hold_toggle <= 1'b1;
+    // Set and toggle hold for 8- and 16-bit data writes!
+    if ( boot_mem_wr_hold ) boot_mem_wr_hold_toggle <= ~boot_mem_wr_hold_toggle;
+end // mem_boot_access
 `else // XC3S200_TB defined
 reg  [31:0] boot_mem[0:BMS-1];
 
@@ -348,8 +364,6 @@ initial begin : init_boot_memory
             // Some simulators require files accessed to be placed in their
             // working (build) directory!
             $display( "Could not open xc3s200_boot.mem or xc3s200_boot.bin file!" );
-            // Xilinx ISE 14.7 synthesis does not support $fopen and $fread!
-            $readmemh( "xc3s200_boot.mem", boot_mem );
         end
     end
 end
@@ -357,10 +371,20 @@ end
 /*============================================================================*/
 always @(posedge clk) begin : mem_boot_access // Single port block RAM
 /*============================================================================*/
+    boot_mem_wr_hold_toggle <= 1'b1;
+
     if ( boot_mem_en ) begin
-        if ( &mem_io_wmask ) begin // Only 32-bit writes!
-            boot_mem[mem_io_a[10:2]] <= mem_io_d_wr;
+        if ( |mem_io_wmask ) begin
+            // Set and toggle hold for 8- and 16-bit data writes!
+            if ( !( &mem_io_wmask )) boot_mem_wr_hold_toggle <= ~boot_mem_wr_hold_toggle;
+
+            boot_mem[mem_io_a[10:2]] <= {
+                ( mem_io_wmask[0] ? mem_io_d_wr[7:0] : mem_boot_d_rd[7:0] ),
+                ( mem_io_wmask[1] ? mem_io_d_wr[15:8] : mem_boot_d_rd[15:8] ),
+                ( mem_io_wmask[2] ? mem_io_d_wr[23:16] : mem_boot_d_rd[23:16] ),
+                ( mem_io_wmask[3] ? mem_io_d_wr[31:24] : mem_boot_d_rd[31:24] )};
         end
+
         mem_boot_d_rd <= boot_mem[mem_io_a[10:2]];
     end
 end // mem_boot_access
@@ -412,7 +436,7 @@ assign LED[4] = BTN[0] | led_disp[4];
 assign LED[5] = BTN[1] | led_disp[5];
 assign LED[6] = BTN[2] | led_disp[6];
 assign LED[7] = ARST | led_disp[7];
-wire io_led_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-4] );
+wire io_led_r0r31_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-4] );
 
 wire io_uart_sel = ( ~boot_mem_en & mem_io_a[AW-1] & mem_io_a[AW-2] );
 assign uart_io_rx_dr = io_uart_sel & mem_io_rd & uart_io_rx_dv;
@@ -439,10 +463,11 @@ always @(posedge clk) begin : mem_io_access
             end
         end
 
-        if ( io_led_sel ) begin
-            mem_io_d_rd <= {{24{1'b0}}, LED};
+        if ( io_led_r0r31_sel ) begin
+            mem_io_d_rd <= {{20{1'b0}}, r0r31_sel, LED};
 
             if ( mem_io_wmask[0] ) led_disp <= mem_io_d_wr[7:0];
+            if ( mem_io_wmask[1] ) r0r31_sel <= mem_io_d_wr[11:8];
         end
     end else begin
         mem_io_d_rd <= mem_d_rd;

@@ -27,12 +27,12 @@ _start:
 	addi	sp,sp,16
 	jr	ra
 	.size	_start, .-_start
-	.globl	pLED
+	.globl	pLED_R0R31
 	.section	.srodata,"a"
 	.align	2
-	.type	pLED, @object
-	.size	pLED, 4
-pLED:
+	.type	pLED_R0R31, @object
+	.size	pLED_R0R31, 4
+pLED_R0R31:
 	.word	1179648
 	.globl	pSSG
 	.align	2
@@ -132,7 +132,7 @@ pSysReset:
 	.section	.rodata
 	.align	2
 .LC0:
-	.string	"\rBoot xc3c200, wait for xmodem system binary (press BNT0)...\r"
+	.string	"\rBoot xc3c200, wait for xmodem system binary (press BTN0)...\r"
 	.section	.srodata
 	.align	2
 	.type	pBootMsg, @object
