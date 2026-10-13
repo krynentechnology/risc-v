@@ -307,7 +307,7 @@ initial begin
     $display( "XC3S200_JASCRV32 simulation started" );
     #10000
     wait ( rx1_data == LF ); // JascRV32 xc3s200_boot.c boot message should be displayed
-    wait ( xc3s200_jascRV32_dut.console.uart_io_tx_dr );
+    wait ( xc3s200_jascRV32_dut.console.uart_io_tx_dr ); // Console prompt output done
     file = $fopen( "xc3s200_sys.bin", "rb" ); // Open binary file!
     if ( file ) begin
         x_frame = 1;
@@ -348,11 +348,12 @@ initial begin
     end
     #10000
     wait ( rx1_data == LF ); // JascRV32 xc3s200_sys.c system message should be displayed
+    wait ( xc3s200_jascRV32_dut.console.uart_io_tx_dr ); // Console prompt output done
     #1000
     btn[0] = 1; // Context switch!
     wait ( xc3s200_jascRV32_dut.r0r31_sel == 1 );
     btn[0] = 0;
-    #1000
+    #15000
     $display( "Simulation finished" );
     $finish;
 end

@@ -366,7 +366,7 @@ always @(posedge clk) begin : execute
         // isLoad related flags and registers, one clock cycle delayed!
         opcode_14_n <= ~opcode[14];
         loadstore_addr_ <= loadstore_addr[1:0];
-        rdId_ <= rdId;
+        rdId_ <= ( isLoad & isLoad_ ) ? opcode[11:7] : rdId; // Adjacent isLoad!
         rdUpdate_ <= isLoad_ ? rdUpdate : dp_bram_data_ai; // isLoad_ => dp_bram_data_ai = load_data
         // Pulse (single clock clycle) flags for single clock cycle fetch_decode!
         isLoad <= 0;

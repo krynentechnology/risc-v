@@ -11,10 +11,12 @@ if not defined RISCVGCC (
   echo "o" argument is optional afterwards for to keep generated object files.
   goto :END
 )
+:: To generate map file add "-Xlinker -Map=xc3s200_boot.map"
 if exist xc3s200_boot.c (
   riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -S -o xc3s200_boot.s xc3s200_boot.c
   riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -nostdlib -ffreestanding -fno-delete-null-pointer-checks -s -Os -Txc3s200_boot.ld -o xc3s200_boot.o xc3s200_boot.c
 )
+:: To display actual generated code: riscv-none-elf-objdump.exe -d xc3s200_boot.o
 if exist xc3s200_boot.o (
   riscv-none-elf-objcopy.exe -O binary xc3s200_boot.o ..\xc3s200\xc3s200_boot.bin
   riscv-none-elf-objcopy.exe -O verilog xc3s200_boot.o xc3s200_boot.ver
@@ -36,12 +38,14 @@ if exist xc3s200_boot.o (
     del xc3s200_boot.o
   )
 )
+:: To generate map file add "-Xlinker -Map=xc3s200_sys.map"
 if exist xc3s200_sys.c (
   if "%1"=="s" (
     riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -S -o xc3s200_sys.s xc3s200_sys.c
   )
   riscv-none-elf-gcc.exe -Wall -march=rv32i -mabi=ilp32 -nostdlib -ffreestanding -fno-delete-null-pointer-checks -s -Os -Txc3s200_sys.ld -o xc3s200_sys.o xc3s200_sys.c
 )
+:: To display actual generated code: riscv-none-elf-objdump.exe -d xc3s200_sys.o
 if exist xc3s200_sys.o (
   riscv-none-elf-objcopy.exe -O binary xc3s200_sys.o ..\xc3s200\xc3s200_sys.bin
   if "%1"=="s" (

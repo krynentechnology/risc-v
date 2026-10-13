@@ -92,38 +92,39 @@ char* const p2 = "2\r";
 void printBtn0() {
     putChar( pBTN );
     putChar( p0 );
-    *pLED_R0R31 = 0; // Set R0R31 to run()
 }
 
 void printBtn1() {
     putChar( pBTN );
     putChar( p1 );
-    *pLED_R0R31 = 0; // Set R0R31 to run()
 }
 
 void printBtn2() {
     putChar( pBTN );
     putChar( p2 );
-    *pLED_R0R31 = 0; // Set R0R31 to run()
 }
 
 void run() {
-    static int booted = 0;
+    int r0r31sel = (( getBtnR0R31sel() & R0R31_MASK ) >> 8 );
+    // Sets stack top for every R0R31 set!
+    if ( 1 == r0r31sel ) asm volatile( "la sp,_stack_top-100" );
+    if ( 2 == r0r31sel ) asm volatile( "la sp,_stack_top-200" );
+    if ( 3 == r0r31sel ) asm volatile( "la sp,_stack_top-300" );
 
-    if ( booted != 1 ) {
+    if ( 0 == r0r31sel ) {
         putChar( pSysString );
-        booted = 1;
         // Initialize global variables! Could be located in XMODEM end-of-file section.
         btn0 = 0;
         btn1 = 0;
         btn2 = 0;
-    } else {
-        int r0r31sel = (( getBtnR0R31sel() & R0R31_MASK ) >> 8 );
+    } else { // R0R31 set > 0!
+        putChar( pAterisk );
 
-        if ( r0r31sel ) putChar( pAterisk ); // R0R31 set > 0!
         if ( 1 == r0r31sel ) printBtn0();
         if ( 2 == r0r31sel ) printBtn1();
         if ( 3 == r0r31sel ) printBtn2();
+
+        *pLED_R0R31 = 0; // Return to while loop
     }
 
     while ( 1 ) {
