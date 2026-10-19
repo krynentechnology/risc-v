@@ -15,10 +15,14 @@ MEMORY {
 SECTIONS {
     _stack_top = ORIGIN(SRAM) + LENGTH(SRAM);
 
-    .text   : {KEEP(*(.text.boot))
+    .text    : {KEEP(*(.text.boot))
                KEEP(*(.stack)) /* Start of stack address space */
-               *(.text*)}   > SRAM
-    .rodata : {*(.rodata*)} > SRAM
-    .data   : {*(.data*)}   > SRAM
-    .bss    : {*(.bss*)}    > SRAM
+               *(.text*)}     > SRAM
+    .rodata  : {*(.rodata*)}  > SRAM
+    .data    : {*(.data*)}    > SRAM
+    .bss     : {*(.bss*)}     > SRAM
+    .sbss    : {*(.sbss*)}    > SRAM
+    .comment : {*(.comment*)} > SRAM
+    .note.GNU-stack   : {*(.note.GNU-stack*)}   > SRAM
+    .riscv.attributes : {*(.riscv.attributes*)} > SRAM
 }

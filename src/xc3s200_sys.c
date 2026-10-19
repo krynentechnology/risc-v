@@ -43,20 +43,27 @@ volatile unsigned int* const pLED_R0R31 = (unsigned int*)0x120000; // LEDs, R0R3
 typedef void VOID_FUNC();
 char* const pSysString = "System soft core xc3c200 started...\r";
 
+// Defines
 #define BTN0_MASK     0x10
 #define BTN1_MASK     0x20
 #define BTN2_MASK     0x40
 #define BTN_THRESHOLD 10
-#define R0R31_MASK    0xF00
 
+#define R0R31SET1_MASK 0x100
+#define R0R31SET2_MASK 0x200
+#define R0R31SET3_MASK 0x300
+#define R0R31SET_MASK  ( R0R31SET1_MASK | R0R31SET2_MASK | R0R31SET2_MASK )
+
+// Global variables
+int btn_r0r31;
 int btn0;
 int btn1;
 int btn2;
 
-int getBtnR0R31sel() {
-    int btn = *pLED_R0R31;
+int getBtn() {
+    btn_r0r31 = *pLED_R0R31;
 
-    if ( btn & BTN0_MASK ) {
+    if ( btn_r0r31 & BTN0_MASK ) {
         if ( btn0 < BTN_THRESHOLD ) {
             btn0++;
         } else return BTN0_MASK;
@@ -64,7 +71,7 @@ int getBtnR0R31sel() {
         btn0--;
     }
 
-    if ( btn & BTN1_MASK ) {
+    if ( btn_r0r31 & BTN1_MASK ) {
         if ( btn1 < BTN_THRESHOLD ) {
             btn1++;
         } else return BTN1_MASK;
@@ -72,7 +79,7 @@ int getBtnR0R31sel() {
         btn1--;
     }
 
-    if ( btn & BTN2_MASK ) {
+    if ( btn_r0r31 & BTN2_MASK ) {
         if ( btn2 < BTN_THRESHOLD ) {
             btn2++;
         } else return BTN2_MASK;
@@ -80,7 +87,7 @@ int getBtnR0R31sel() {
         btn2--;
     }
 
-    return ( btn & ~( BTN0_MASK | BTN1_MASK | BTN2_MASK )); // BTN0-2 excluded!
+    return 0;
 }
 
 char* const pAterisk = "*";
@@ -90,59 +97,68 @@ char* const p1 = "1\r";
 char* const p2 = "2\r";
 
 void printBtn0() {
-    putChar( pBTN );
-    putChar( p0 );
+    while ( 1 ) { // Thread printBtn0
+        if ( *pLED_R0R31 & R0R31SET1_MASK ) {
+            putChar( pBTN );
+            putChar( p0 );
+            *pLED_R0R31 = 0; // Context switch to run()
+        }
+    }
 }
 
 void printBtn1() {
-    putChar( pBTN );
-    putChar( p1 );
+    while ( 1 ) { // Thread printBtn1
+        if ( *pLED_R0R31 & R0R31SET2_MASK ) {
+            putChar( pBTN );
+            putChar( p1 );
+            *pLED_R0R31 = 0; // Context switch to run()
+        }
+    }
 }
 
 void printBtn2() {
-    putChar( pBTN );
-    putChar( p2 );
+    while ( 1 ) { // Thread printBtn2
+        if ( *pLED_R0R31 & R0R31SET3_MASK ) {
+            putChar( pBTN );
+            putChar( p2 );
+            *pLED_R0R31 = 0; // Context switch to run()
+        }
+    }
 }
 
 void run() {
-    int r0r31sel = (( getBtnR0R31sel() & R0R31_MASK ) >> 8 );
-    // Sets stack top for every R0R31 set!
-    if ( 1 == r0r31sel ) asm volatile( "la sp,_stack_top-100" );
-    if ( 2 == r0r31sel ) asm volatile( "la sp,_stack_top-200" );
-    if ( 3 == r0r31sel ) asm volatile( "la sp,_stack_top-300" );
+    btn_r0r31 = *pLED_R0R31;
 
-    if ( 0 == r0r31sel ) {
+    if ( btn_r0r31 & R0R31SET_MASK ) { // R0R31 set > 0!
+        asm volatile( "la sp,_stack_top-100" );
+        // Only when R0R31 set R0 (PC) = 0!
+        putChar( pAterisk );
+
+        if ( btn_r0r31 & R0R31SET1_MASK ) asm volatile( "j printBtn0" );
+        if ( btn_r0r31 & R0R31SET2_MASK ) asm volatile( "j printBtn1" );
+        if ( btn_r0r31 & R0R31SET3_MASK ) asm volatile( "j printBtn2" );
+    } else {
         putChar( pSysString );
-        // Initialize global variables! Could be located in XMODEM end-of-file section.
+        // Initialize btn0-2 global variables! Could be located in XMODEM end-of-file section.
         btn0 = 0;
         btn1 = 0;
         btn2 = 0;
-    } else { // R0R31 set > 0!
-        putChar( pAterisk );
-
-        if ( 1 == r0r31sel ) printBtn0();
-        if ( 2 == r0r31sel ) printBtn1();
-        if ( 3 == r0r31sel ) printBtn2();
-
-        *pLED_R0R31 = 0; // Return to while loop
     }
 
     while ( 1 ) {
-        int btn = getBtnR0R31sel();
-
-        if ( btn & BTN0_MASK ) {
+        if ( getBtn() & BTN0_MASK ) {
             btn0 = 0;
-            *pLED_R0R31 = 1 << 8; // Set R0R31 (0-15) select
+            *pLED_R0R31 = R0R31SET1_MASK; // Set 1 R0R31 (0-15) select
         }
 
-        if ( btn & BTN1_MASK ) {
+        if ( getBtn() & BTN1_MASK ) {
             btn1 = 0;
-            *pLED_R0R31 = 2 << 8; // Set R0R31 (0-15) select
+            *pLED_R0R31 = R0R31SET2_MASK; // Set 2 R0R31 (0-15) select
         }
 
-        if ( btn & BTN2_MASK ) {
+        if ( getBtn() & BTN2_MASK ) {
             btn2 = 0;
-            *pLED_R0R31 = 3 << 8; // Set R0R31 (0-15) select
+            *pLED_R0R31 = R0R31SET3_MASK; // Set 3 R0R31 (0-15) select
         }
     }
 }

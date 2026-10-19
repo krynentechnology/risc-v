@@ -353,7 +353,7 @@ initial begin
     btn[0] = 1; // Context switch!
     wait ( xc3s200_jascRV32_dut.r0r31_sel == 1 );
     btn[0] = 0;
-    #15000
+    #50000
     $display( "Simulation finished" );
     $finish;
 end
