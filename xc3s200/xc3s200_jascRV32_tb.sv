@@ -353,7 +353,8 @@ initial begin
     btn[0] = 1; // Context switch!
     wait ( xc3s200_jascRV32_dut.r0r31_sel == 1 );
     btn[0] = 0;
-    #50000
+    wait ( rx1_data == LF ); // JascRV32 xc3s200_sys.c "*BTN0" should be displayed
+    #1000
     $display( "Simulation finished" );
     $finish;
 end
