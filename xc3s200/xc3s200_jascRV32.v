@@ -96,7 +96,6 @@ endfunction // swap32
 
 localparam AW = 21; // 1Mb memory and 1Mb I/O space.
 localparam RSTW = 4; // Reset delay shift width
-localparam PC_BITS = 12;
 localparam NR_BITS = 8;
 localparam RX_FIFO = 8;
 
@@ -200,10 +199,10 @@ wire hold = boot_mem_wr_hold & hold_toggle;
 reg  [3:0] r0r31_sel = 0;
 
 jascRV32 #(
-   .PC_RESET(32'h00100000),
-   .AW(AW),
-   .RVM(0),
-   .DELAY_MULTIPLY(0))
+    .PC_RESET(32'h00100000),
+    .AW(AW),
+    .RVM(0),
+    .DELAY_MULTIPLY(0))
 riscv (
     .clk(clk),
     .rst_n(rst_n),
@@ -213,7 +212,7 @@ riscv (
     .wr_data(mem_io_d_wr),
     .wr_mask(mem_io_wmask),
     .sccc(sccc),
-    .hold(1'b0),
+    .hold(hold),
     .r0r31_sel(r0r31_sel)
     );
 

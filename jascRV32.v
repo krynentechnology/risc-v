@@ -31,7 +31,7 @@
  *  BSD 3-Clause License, see https://opensource.org/license/BSD-3-clause
  *
  *  Description: JascRV32, Just Another Soft Core (Single Cycle) RISC-V 32-bit
- *               processor. Inspired by FemtoRV32. Differences are:
+ *               processor. Inspired by FemtoRV32.
  *
  *  - Verilog 2001 compliant - ISE 14.7 synthesis
  *  - RISC-V registers R0-R31 are (synchronous) dual port block ram based.
@@ -198,6 +198,8 @@ wire [31:0] aluOut;
 wire isDivide;
 wire isMultiplyDelayed;
 wire aluBusy;
+reg  aluBusy_ = 0; // aluBusy, one clock cycle delayed!
+wire aluFinished = aluBusy_ & ~aluBusy;
 
 localparam CCW = RVM ? 64 : 32; // Cycle Counter Width
 reg  [CCW-1:0] cycles = 0;
@@ -231,18 +233,21 @@ if ( RVM ) begin : RVM1 // Conditional systhesis!
     reg  [31:0] quotient = 0;
     reg  [31:0] quotient_msk = 0;
 
-    wire divstep_do = divisor <= {31'b0, dividend};
-    wire [31:0] dividendN = divstep_do ? dividend - divisor[31:0] : dividend;
-    wire [31:0] quotientN = divstep_do ? quotient | quotient_msk  : quotient;
+    wire isALUregFuncM = isALUreg & opcode[25];
+    wire isDivide_ = isALUregFuncM & opcode[14]; // |funct3Is[7:4];
+    wire divstep_do = ( divisor <= {31'b0, dividend} );
+    wire [31:0] dividendN = divstep_do ? ( dividend - divisor[31:0] ) : dividend;
+    wire [31:0] quotientN = divstep_do ? ( quotient | quotient_msk ) : quotient;
     wire div_sign = ~opcode[12] & ( opcode[13] ? aluIn1[31] : ( aluIn1[31] != aluIn2[31] ) & |aluIn2 );
     reg  [31:0] divResult = 0;
+    reg  isDivide__ = 0;
 
     /*============================================================================*/
     always @(posedge clk) begin : div_rem_process // Highly inspired by PicoRV32
     /*============================================================================*/
-        if ( isDivide && !aluBusy ) begin
-            dividend <= ~opcode[12] & aluIn1[31] ? -aluIn1 : aluIn1;
-            divisor  <= {( ~opcode[12] & aluIn2[31] ? -aluIn2 : aluIn2 ), 31'b0};
+        if ( isDivide_ && !aluBusy ) begin // Patterson and Hennessy's algorithm
+            dividend <= ( ~opcode[12] & aluIn1[31] ) ? -aluIn1 : aluIn1;
+            divisor  <= {(( ~opcode[12] & aluIn2[31] ) ? -aluIn2 : aluIn2 ), 31'b0};
             quotient <= 0;
             quotient_msk <= 1 << 31;
         end else begin
@@ -252,19 +257,20 @@ if ( RVM ) begin : RVM1 // Conditional systhesis!
             quotient_msk <= quotient_msk >> 1;
         end
 
+        aluBusy_ <= aluBusy;
+        isDivide__ <= isDivide_ | aluBusy;
         divResult <= opcode[13] ? dividendN : quotientN;
     end // div_rem_process
 
     wire [31:0] aluOut_muldiv =
         (  funct3Is[0]   ? multiply[31:0]  : 32'b0 ) | // 0:MUL
         ( |funct3Is[3:1] ? multiply[63:32] : 32'b0 ) | // 1:MULH, 2:MULHSU, 3:MULHU
-        (  opcode[14]     ? div_sign ? -divResult : divResult : 32'b0 ); // 4:DIV, 5:DIVU, 6:REM, 7:REMU
+        (  opcode[14]    ? ( div_sign ? -divResult : divResult ) : 32'b0 ); // 4:DIV, 5:DIVU, 6:REM, 7:REMU
 
-    wire isALUregFuncM = isALUreg & opcode[25];
-    assign isDivide = isALUregFuncM & opcode[14]; // |funct3Is[7:4];
-    assign isMultiplyDelayed = DELAY_MULTIPLY & isALUregFuncM & ~isDivide;
+    assign isDivide = isDivide_ | isDivide__;
+    assign isMultiplyDelayed = DELAY_MULTIPLY & isALUregFuncM & ~isDivide_;
     assign aluBusy = |quotient_msk; // ALU is busy if division is in progress.
-    assign aluOut = isALUregFuncM ? aluOut_muldiv : aluOut_base;
+    assign aluOut = ( isALUregFuncM | isDivide__ ) ? aluOut_muldiv : aluOut_base;
 
     wire sel_cyclesh = ( opcode[31:20] == 12'hC80 );
     assign CSR_read = sel_cyclesh ? cycles[63:32] : cycles[31:0];
@@ -335,21 +341,20 @@ wire [31:0] dp_bram1_data_ao;
 assign addr = ( isLoad | isStore ) ? loadstore_addr[AW-1:0] : PC_addr; // Memory (I/O) address
 
 // The value written back into the destination register.
-wire [31:0] rdUpdate = |rdId ? // rdId > 0
-         (( isALU            ? aluOut     : 32'b0 ) |  // ALUreg, ALUimm
-          ( isAUIPC          ? PCplusImm  : 32'b0 ) |  // AUIPC
-          ( isJAL   | isJALR ? pc_        : 32'b0 ) |  // JAL, JALR (PCplus4)
-          ( isLUI            ? Uimm       : 32'b0 ) |  // LUI
-          ( isSYSTEM         ? CSR_read   : 32'b0 ))   // SYSTEM
-                                          : {{(32-AW){1'b0}}, pc_ };
+wire [31:0] rdUpdate = |rdId    ? // rdId > 0
+         (( isALU | aluFinished ? aluOut     : 32'b0 ) |  // ALUreg, ALUimm
+          ( isAUIPC             ? PCplusImm  : 32'b0 ) |  // AUIPC
+          ( isJAL | isJALR      ? pc_        : 32'b0 ) |  // JAL, JALR (PCplus4)
+          ( isLUI               ? Uimm       : 32'b0 ) |  // LUI
+          ( isSYSTEM            ? CSR_read   : 32'b0 ))   // SYSTEM
+                                             : {{(32-AW){1'b0}}, pc_ };
 
 wire [31:0] dp_bram_data_ai = isLoad_ ? load_data : isLoad__ ? rdUpdate_ : rdUpdate;
 reg  [3:0] r0r31_set = 0;
-reg  aluBusy_ = 0; // aluBusy, one clock cycle delayed!
 reg  isMultiplyDelayed_ = 0; // isMultiplyDelayed, one clock cycle delayed!
 reg  [1:0] cs_ws = 0; // Context switch wait states
 wire zero_cs_ws = ( cs_ws == 0 );
-wire fetch_decode = ~( aluBusy | hold | isJump | isLoad_ | isStore_ | isMultiplyDelayed );
+wire fetch_decode = ~( hold | isDivide | isJump | isLoad_ | isStore_ | isMultiplyDelayed );
 
 /*============================================================================*/
 always @(posedge clk) begin : execute
@@ -358,7 +363,6 @@ always @(posedge clk) begin : execute
         isStore_ <= 1'b1; // Delay start of processing opcode one clock cycle!
         PC <= PC_RESET[AW-1:0];
     end else begin
-        aluBusy_ <= aluBusy;
         isMultiplyDelayed_ <= isMultiplyDelayed;
         // isLoad and isStore related flags, one clock cycle delayed!
         mem_byteAccess_ <= mem_byteAccess;
@@ -368,7 +372,7 @@ always @(posedge clk) begin : execute
         loadstore_addr_ <= loadstore_addr[1:0];
         rdId_ <= ( isLoad & isLoad_ ) ? opcode[11:7] : rdId; // Adjacent isLoad!
          // isLoad_ => dp_bram_data_ai = load_data, isStore__ => keep rdUpdate_!
-        if ( !isStore__ ) rdUpdate_ <= isLoad_ ? rdUpdate : dp_bram_data_ai;
+        if ( !isStore__ ) rdUpdate_ <= ( ~isLoad & isLoad_ ) ? rdUpdate : dp_bram_data_ai;
         // Pulse (single clock clycle) flags for single clock cycle fetch_decode!
         isLoad <= 0;
         isLoad_ <= isLoad;
@@ -377,8 +381,8 @@ always @(posedge clk) begin : execute
         isAUIPC <= 0;
         isStore <= 0;
         isStore_ <= isStore;
-        isStore__ <= isStore_ | isLoad_; // Adjacent isLoad/isStore affect rdUpdEn!
-        isALUreg <= 0; // isMultiplyDelayed
+        isStore__ <= isStore_ | isLoad_ | aluFinished; // Adjacent isLoad/isStore or aluFinished affect rdUpdEn!
+        isALUreg <= 0;
         isLUI <= 0;
         isBranch <= 0;
         isJAL <= 0;
@@ -428,7 +432,7 @@ always @(posedge clk) begin : execute
 end // execute
 
 wire needToWait = hold | isBranch | isDivide | isJump_ | isLoad | isMultiplyDelayed | isStore | isStore__;
-wire rdUpdEn =  ( |rdId | |cs_ws ) & ( ~needToWait | ( aluBusy_ & ~aluBusy ) | ( cs_ws == 2'd3 ) | isLoad_ | isMultiplyDelayed_ );
+wire rdUpdEn =  ( |rdId | |cs_ws ) & ( ~needToWait | aluFinished | ( cs_ws == 2'd3 ) | isLoad_ | isMultiplyDelayed_ );
 
 dp_bram #(
     .AW(9),
