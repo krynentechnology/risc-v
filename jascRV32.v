@@ -412,7 +412,7 @@ always @(posedge clk) begin : execute
         if ( zero_cs_ws && !hold ) begin
              pc_ <= PC_addr;
              pc__ <= pc_;
-            if ( !( isLoad | isStore )) begin
+            if ( !( isLoad | isStore | isDivide )) begin
                 PC <= PC_next;
             end
         end
