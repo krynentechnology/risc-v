@@ -575,67 +575,58 @@ initial begin
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == -40 ) && ( riscv_IM.dp_bram2.bram[5] == -40 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 4, 1, 32'dX ); // "div rd,rs1,rs2" pos rs1 division by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == -1 ) && ( riscv_IM.dp_bram2.bram[5] == -1 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 0, 4, 1, 32'dX ); // "div rd,rs1,rs2" neg rs1 division by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == 1 ) && ( riscv_IM.dp_bram2.bram[5] == 1 ); // Does not match specification!
     result( "div rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 4, 5, 1, 32'dX ); // "divu rd,rs1,rs2"
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == 32'h2AAAAA9A ) && ( riscv_IM.dp_bram2.bram[5] == 31'h2AAAAA9A );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 0, 5, 1, 32'dX ); // "divu rd,rs1,rs2" diviaion by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == -1 ) && ( riscv_IM.dp_bram2.bram[5] == -1 );
     result( "divu rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 4, 6, 1, 32'dX ); // "rem rd,rs1,rs2"
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == -2 ) && ( riscv_IM.dp_bram2.bram[5] == -2 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 0, 6, 1, 32'dX ); // "rem rd,rs1,rs2" neg rs1 division by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == -200 ) && ( riscv_IM.dp_bram2.bram[5] == -200 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 6, 1, 32'dX ); // "rem rd,rs1,rs2" pos rs1 division by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = passed && riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == 6 ) && ( riscv_IM.dp_bram2.bram[5] == 6 );
     result( "rem rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 2, 7, 1, 32'dX ); // "remu rd,rs1,rs2"
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
     passed = passed && ( riscv_IM.dp_bram1.bram[5] == 1 ) && ( riscv_IM.dp_bram2.bram[5] == 1 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 7, 1, 32'dX ); // "remu rd,rs1,rs2" division by zero!
-    gcc( 1 );
-    gcc( 1 );
+    gcc( 2 );
     passed = riscv_IM.aluBusy;
     while ( riscv_IM.aluBusy ) gcc( 1 );
     gcc( 1 );
