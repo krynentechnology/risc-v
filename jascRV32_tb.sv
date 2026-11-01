@@ -537,6 +537,11 @@ initial begin
     passed = passed && ( wr_mask == 4'h1 );
     passed = passed && (( wr_data & 32'h000000FF ) == 32'h00000057 );
     result( "sb rs2,imm12(rs1)" );
+    rd_data = instruction( I_TYPE, isSYSTEM, 8, 0, 5'dX, 0, 7'dX, 0 ); // "ecall"
+    passed = ( riscv_I.dp_bram1.bram[8] == 0 ) && ( riscv_I.dp_bram2.bram[8] == 0 );
+    gcc( 2 ); // Put system clock counter into register x8
+    passed = ( riscv_I.dp_bram1.bram[8] > 0 ) && ( riscv_I.dp_bram2.bram[8] > 0 );
+    result( "ecall" );
     $display( "    ---------------------" );
     $display( "    RISC-V M instructions" );
     $display( "    ---------------------" );
