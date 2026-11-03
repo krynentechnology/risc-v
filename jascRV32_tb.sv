@@ -50,23 +50,23 @@ endtask // gcc
 
 localparam AW = 21;
 
-reg  rvim = 0;
+reg  rvimc = 0;
 wire [AW-1:0] addr_I;
-wire [AW-1:0] addr_IM;
-wire [AW-1:0] addr = rvim ? addr_IM : addr_I;
+wire [AW-1:0] addr_IMC;
+wire [AW-1:0] addr = rvimc ? addr_IMC : addr_I;
 reg  [31:0] rd_data = 0;
 wire rd_I;
-wire rd_IM;
-wire rd = rvim ? rd_IM : rd_I;
+wire rd_IMC;
+wire rd = rvimc ? rd_IMC : rd_I;
 wire [31:0] wr_data_I;
-wire [31:0] wr_data_IM;
-wire [31:0] wr_data = rvim ? wr_data_IM : wr_data_I;
+wire [31:0] wr_data_IMC;
+wire [31:0] wr_data = rvimc ? wr_data_IMC : wr_data_I;
 wire [3:0] wr_mask_I;
-wire [3:0] wr_mask_IM;
-wire [3:0] wr_mask = rvim ? wr_mask_IM : wr_mask_I;
+wire [3:0] wr_mask_IMC;
+wire [3:0] wr_mask = rvimc ? wr_mask_IMC : wr_mask_I;
 wire [31:0] sccc_I;
-wire [31:0] sccc_IM;
-wire [31:0] sccc = rvim ? sccc_IM : sccc_I; // System Clock Cycle Counter
+wire [31:0] sccc_IMC;
+wire [31:0] sccc = rvimc ? sccc_IMC : sccc_I; // System Clock Cycle Counter
 reg  hold = 0;
 reg  [3:0] r0r31_sel = 0; // R0R31 set select
 
@@ -74,9 +74,10 @@ jascRV32 #(
     .PC_RESET(0),
     .AW(AW), // addr[AW-1] = I/O
     .RVM(0),
+    .RVC(0),
     .DELAY_MULTIPLY(0))
 riscv_I (
-    .clk(rvim ? 1'b0 : clk),
+    .clk(rvimc ? 1'b0 : clk),
     .rst_n(rst_n),
     .addr(addr_I),
     .rd_data(rd_data),
@@ -92,16 +93,17 @@ jascRV32 #(
     .PC_RESET(0),
     .AW(AW), // addr[AW-1] = I/O
     .RVM(1),
+    .RVC(1),
     .DELAY_MULTIPLY(0))
-riscv_IM (
-    .clk(rvim ? clk : 1'b0),
+riscv_IMC (
+    .clk(rvimc ? clk : 1'b0),
     .rst_n(rst_n),
-    .addr(addr_IM),
+    .addr(addr_IMC),
     .rd_data(rd_data),
-    .rd(rd_IM),
-    .wr_data(wr_data_IM),
-    .wr_mask(wr_mask_IM),
-    .sccc(sccc_IM),
+    .rd(rd_IMC),
+    .wr_data(wr_data_IMC),
+    .wr_mask(wr_mask_IMC),
+    .sccc(sccc_IMC),
     .hold(hold),
     .r0r31_sel(r0r31_sel)
     );
@@ -185,7 +187,7 @@ reg [AW-1:0] PC = 0;
 initial begin
 /*============================================================================*/
     rst_n = 0;
-    rvim = 0;
+    rvimc = 0;
     #10
     gcc( 2 );
     rst_n = 1;
@@ -545,97 +547,98 @@ initial begin
     $display( "    ---------------------" );
     $display( "    RISC-V M instructions" );
     $display( "    ---------------------" );
-    rvim = 1;
+    rvimc = 1;
+    riscv_IMC.dp_bram1.bram[1] = -100;
+    riscv_IMC.dp_bram2.bram[1] = -100;
+    riscv_IMC.dp_bram1.bram[2] = 5;
+    riscv_IMC.dp_bram2.bram[2] = 5;
+    riscv_IMC.dp_bram1.bram[3] = -200;
+    riscv_IMC.dp_bram2.bram[3] = -200;
+    riscv_IMC.dp_bram1.bram[4] = 6;
+    riscv_IMC.dp_bram2.bram[4] = 6;
+    gcc( 1 ); // First clock cycle after (synchronous) reset does not process opcode!
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 2, 0, 1, 32'dX ); // "mul rd,rs1,rs2"
-    riscv_IM.dp_bram1.bram[1] = -100;
-    riscv_IM.dp_bram2.bram[1] = -100;
-    riscv_IM.dp_bram1.bram[2] = 5;
-    riscv_IM.dp_bram2.bram[2] = 5;
-    riscv_IM.dp_bram1.bram[3] = -200;
-    riscv_IM.dp_bram2.bram[3] = -200;
-    riscv_IM.dp_bram1.bram[4] = 6;
-    riscv_IM.dp_bram2.bram[4] = 6;
     gcc( 1 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 2, 1, 1, 32'dX ); // "mulh rd,rs1,rs2"
     gcc( 1 );
-    passed = ( riscv_IM.dp_bram1.bram[5] == -500 ) && ( riscv_IM.dp_bram2.bram[5] == -500 );
+    passed = ( riscv_IMC.dp_bram1.bram[5] == -500 ) && ( riscv_IMC.dp_bram2.bram[5] == -500 );
     result( "mul rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 2, 3, 1, 32'dX ); // "mulhu rd,rs1,rs2"
     gcc( 1 );
-    passed = ( riscv_IM.dp_bram1.bram[5] == -1 ) && ( riscv_IM.dp_bram2.bram[5] == -1 );
+    passed = ( riscv_IMC.dp_bram1.bram[5] == -1 ) && ( riscv_IMC.dp_bram2.bram[5] == -1 );
     result( "mulh rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 4, 2, 1, 32'dX ); // "mulhsu rd,rs1,rs2"
     gcc( 1 );
-    passed = ( riscv_IM.dp_bram1.bram[5] == 4 ) && ( riscv_IM.dp_bram2.bram[5] == 4 );
+    passed = ( riscv_IMC.dp_bram1.bram[5] == 4 ) && ( riscv_IMC.dp_bram2.bram[5] == 4 );
     result( "mulhu rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 2, 4, 1, 32'dX ); // "div rd,rs1,rs2"
     gcc( 1 );
-    passed = ( riscv_IM.dp_bram1.bram[5] == 5 ) && ( riscv_IM.dp_bram2.bram[5] == 5 );
+    passed = ( riscv_IMC.dp_bram1.bram[5] == 5 ) && ( riscv_IMC.dp_bram2.bram[5] == 5 );
     result( "mulhsu rd,rs1,rs2" );
-    passed = riscv_IM.RVM1.isDivide_ && !riscv_IM.aluBusy;
+    passed = riscv_IMC.RVM1.isDivide_ && !riscv_IMC.aluBusy;
     gcc( 1 );
-    passed = passed && !riscv_IM.isALUreg && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
-    passed = passed && !riscv_IM.aluBusy && riscv_IM.aluFinished;
+    passed = passed && !riscv_IMC.isALUreg && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
+    passed = passed && !riscv_IMC.aluBusy && riscv_IMC.aluFinished;
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == -40 ) && ( riscv_IM.dp_bram2.bram[5] == -40 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == -40 ) && ( riscv_IMC.dp_bram2.bram[5] == -40 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 4, 1, 32'dX ); // "div rd,rs1,rs2" pos rs1 division by zero!
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == -1 ) && ( riscv_IM.dp_bram2.bram[5] == -1 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == -1 ) && ( riscv_IMC.dp_bram2.bram[5] == -1 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 0, 4, 1, 32'dX ); // "div rd,rs1,rs2" neg rs1 division by zero!
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == 1 ) && ( riscv_IM.dp_bram2.bram[5] == 1 ); // Does not match specification!
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == 1 ) && ( riscv_IMC.dp_bram2.bram[5] == 1 ); // Does not match specification!
     result( "div rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 4, 5, 1, 32'dX ); // "divu rd,rs1,rs2"
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == 32'h2AAAAA9A ) && ( riscv_IM.dp_bram2.bram[5] == 31'h2AAAAA9A );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == 32'h2AAAAA9A ) && ( riscv_IMC.dp_bram2.bram[5] == 31'h2AAAAA9A );
     rd_data = instruction( R_TYPE, isALUreg, 5, 1, 0, 5, 1, 32'dX ); // "divu rd,rs1,rs2" diviaion by zero!
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == -1 ) && ( riscv_IM.dp_bram2.bram[5] == -1 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == -1 ) && ( riscv_IMC.dp_bram2.bram[5] == -1 );
     result( "divu rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 4, 6, 1, 32'dX ); // "rem rd,rs1,rs2"
     gcc( 2 );
-    passed = riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == -2 ) && ( riscv_IM.dp_bram2.bram[5] == -2 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == -2 ) && ( riscv_IMC.dp_bram2.bram[5] == -2 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 3, 0, 6, 1, 32'dX ); // "rem rd,rs1,rs2" neg rs1 division by zero!
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == -200 ) && ( riscv_IM.dp_bram2.bram[5] == -200 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == -200 ) && ( riscv_IMC.dp_bram2.bram[5] == -200 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 6, 1, 32'dX ); // "rem rd,rs1,rs2" pos rs1 division by zero!
     gcc( 2 );
-    passed = passed && riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = passed && riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == 6 ) && ( riscv_IM.dp_bram2.bram[5] == 6 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == 6 ) && ( riscv_IMC.dp_bram2.bram[5] == 6 );
     result( "rem rd,rs1,rs2" );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 2, 7, 1, 32'dX ); // "remu rd,rs1,rs2"
     gcc( 2 );
-    passed = riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == 1 ) && ( riscv_IM.dp_bram2.bram[5] == 1 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == 1 ) && ( riscv_IMC.dp_bram2.bram[5] == 1 );
     rd_data = instruction( R_TYPE, isALUreg, 5, 4, 0, 7, 1, 32'dX ); // "remu rd,rs1,rs2" division by zero!
     gcc( 2 );
-    passed = riscv_IM.aluBusy;
-    while ( riscv_IM.aluBusy ) gcc( 1 );
+    passed = riscv_IMC.aluBusy;
+    while ( riscv_IMC.aluBusy ) gcc( 1 );
     gcc( 1 );
-    passed = passed && ( riscv_IM.dp_bram1.bram[5] == 6 ) && ( riscv_IM.dp_bram2.bram[5] == 6 );
+    passed = passed && ( riscv_IMC.dp_bram1.bram[5] == 6 ) && ( riscv_IMC.dp_bram2.bram[5] == 6 );
     result( "remu rd,rs1,rs2" );
     gcc( 1 );
    #10

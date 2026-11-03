@@ -44,6 +44,8 @@
  *  - The RVM parameter adds multiply-divide instructions.
  *  - When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation
  *    with one clock cycle (if required to meet timing constraints).
+ *  - RVIM instructions should be 32-bit aligned.
+ *  - The RVC parameter adds compressed instructions support (16-bit aligned).
  *
  *  In general, instructions take one clock cycle, except for instructions (two
  *  clock cycles) following branch/jump/load/store instructions (sets the cpu
@@ -59,7 +61,8 @@ module jascRV32 #( // No inout (bus) interface!
 /*============================================================================*/
     parameter PC_RESET = 32'h00000000, // Program counter reset address
     parameter [5:0] AW = 24, // S(D)RAM Address Width (32-bit aligned for PC)
-    parameter [0:0] RVM = 0, // RISC-V Multiply-divide instruction extension
+    parameter [0:0] RVM = 0, // RISC-V Multiply-divide instructions extension
+    parameter [0:0] RVC = 0, // RISC-V Compressed instructions support
     parameter [0:0] DELAY_MULTIPLY = 0, // Delay multiply one clock cycle
     parameter R0R31MEM = "" ) // Register set R0-R31 (0-15) initialization
     (
@@ -106,7 +109,7 @@ reg  isLUI = 0;
 reg  isJAL = 0 ;
 reg  isJALR = 0;
 reg  isStore = 0;
-reg  isStore_ = 0; // isStore, one clock cycle delayed!
+reg  isStore_ = 1'b1; // isStore, one clock cycle delayed!
 reg  isStore__ = 0; // isStore, two clock cycles delayed!
 reg  isSYSTEM = 0;
 wire isALU = isALUimm | isALUreg;
@@ -117,19 +120,19 @@ reg  [AW-1:0] PC = PC_RESET[AW-1:0]; // The program counter.
 reg  [AW-1:0] pc_ = 0; // PC, one clock cycle delayed!
 reg  [AW-1:0] pc__ = 0; // PC, two clock cycles delayed!
 
-reg  [31:0] opcode = 0;
+reg  [31:0] instr = 0;
 reg  [4:0] rdId_ = 0; // rdId, , one clock cycle delayed!
-wire [4:0] rdId = isLoad_ ? rdId_ : opcode[11:7]; // The destination register
+wire [4:0] rdId = isLoad_ ? rdId_ : instr[11:7]; // The destination register
 reg  [7:0] funct3Is = 0;
-wire [4:0] rs1Id = opcode[19:15]; // The source 1 register
-wire [4:0] rs2Id = opcode[24:20]; // The source 2 register
+wire [4:0] rs1Id = instr[19:15]; // The source 1 register
+wire [4:0] rs2Id = instr[24:20]; // The source 2 register
 
 // The five immediate formats
-wire [31:0] Uimm = {opcode[31:12], {12{1'b0}}};
-wire [31:0] Iimm = {{21{opcode[31]}}, opcode[30:20]};
-wire [31:0] Simm = {{21{opcode[31]}}, opcode[30:25], opcode[11:7]};
-wire [31:0] Bimm = {{20{opcode[31]}}, opcode[7], opcode[30:25], opcode[11:8], 1'b0};
-wire [31:0] Jimm = {{12{opcode[31]}}, opcode[19:12], opcode[20], opcode[30:21], 1'b0};
+wire [31:0] Uimm = {instr[31:12], {12{1'b0}}};
+wire [31:0] Iimm = {{21{instr[31]}}, instr[30:20]};
+wire [31:0] Simm = {{21{instr[31]}}, instr[30:25], instr[11:7]};
+wire [31:0] Bimm = {{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0};
+wire [31:0] Jimm = {{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0};
 
 wire [31:0] load_data; // The data retreived from isLoad
 reg  [31:0] rdUpdate_ = 0; // The (last) value written back to the destination register rdId
@@ -168,7 +171,7 @@ wire [31:0] shifter_in = funct3Is[1] ? {
     aluIn1[24], aluIn1[25], aluIn1[26], aluIn1[27], aluIn1[28], aluIn1[29],
     aluIn1[30], aluIn1[31]} : aluIn1;
 
-wire [31:0] shifter = $signed( {opcode[30] & aluIn1[31], shifter_in} ) >>> aluIn2[4:0];
+wire [31:0] shifter = $signed( {instr[30] & aluIn1[31], shifter_in} ) >>> aluIn2[4:0];
 
 wire [31:0] leftshift = {
     shifter[0],  shifter[1],  shifter[2],  shifter[3],  shifter[4],
@@ -180,19 +183,19 @@ wire [31:0] leftshift = {
     shifter[30], shifter[31]};
 
 // Notes:
-// - opcode[30] is 1 for SUB and 0 for ADD
-// - for SUB, need to test also opcode[5] to discriminate ADDI:
+// - instr[30] is 1 for SUB and 0 for ADD
+// - for SUB, need to test also instr[5] to discriminate ADDI:
 //    (1 for ADD/SUB, 0 for ADDI, and Iimm used by ADDI overlaps bit 30 !)
-// - opcode[30] is 1 for SRA (do sign extension) and 0 for SRL
+// - instr[30] is 1 for SRA (do sign extension) and 0 for SRL
 wire [31:0] aluOut_base =
-    ( funct3Is[0] ? ( opcode[30] & opcode[5] ) ? aluMinus[31:0] : aluPlus : 32'b0 ) |
-    ( funct3Is[1] ? leftshift                                             : 32'b0 ) |
-    ( funct3Is[2] ? {31'b0, LT}                                           : 32'b0 ) |
-    ( funct3Is[3] ? {31'b0, LTU}                                          : 32'b0 ) |
-    ( funct3Is[4] ? aluIn1 ^ aluIn2                                       : 32'b0 ) |
-    ( funct3Is[5] ? shifter                                               : 32'b0 ) |
-    ( funct3Is[6] ? aluIn1 | aluIn2                                       : 32'b0 ) |
-    ( funct3Is[7] ? aluIn1 & aluIn2                                       : 32'b0 );
+    ( funct3Is[0] ? ( instr[30] & instr[5] ) ? aluMinus[31:0] : aluPlus : 32'b0 ) |
+    ( funct3Is[1] ? leftshift                                           : 32'b0 ) |
+    ( funct3Is[2] ? {31'b0, LT}                                         : 32'b0 ) |
+    ( funct3Is[3] ? {31'b0, LTU}                                        : 32'b0 ) |
+    ( funct3Is[4] ? aluIn1 ^ aluIn2                                     : 32'b0 ) |
+    ( funct3Is[5] ? shifter                                             : 32'b0 ) |
+    ( funct3Is[6] ? aluIn1 | aluIn2                                     : 32'b0 ) |
+    ( funct3Is[7] ? aluIn1 & aluIn2                                     : 32'b0 );
 
 wire [31:0] aluOut;
 wire isDivide;
@@ -233,12 +236,12 @@ if ( RVM ) begin : RVM1 // Conditional systhesis!
     reg  [31:0] quotient = 0;
     reg  [31:0] quotient_msk = 0;
 
-    wire isALUregFuncM = isALUreg & opcode[25];
-    wire isDivide_ = isALUregFuncM & opcode[14]; // |funct3Is[7:4];
+    wire isALUregFuncM = isALUreg & instr[25];
+    wire isDivide_ = isALUregFuncM & instr[14]; // |funct3Is[7:4];
     wire divstep_do = ( divisor <= {31'b0, dividend} );
     wire [31:0] dividendN = divstep_do ? ( dividend - divisor[31:0] ) : dividend;
     wire [31:0] quotientN = divstep_do ? ( quotient | quotient_msk ) : quotient;
-    wire div_sign = ~opcode[12] & ( opcode[13] ? aluIn1[31] : ( aluIn1[31] != aluIn2[31] ) & |aluIn2 );
+    wire div_sign = ~instr[12] & ( instr[13] ? aluIn1[31] : ( aluIn1[31] != aluIn2[31] ) & |aluIn2 );
     reg  [31:0] divResult = 0;
     reg  isDivide__ = 0;
 
@@ -246,8 +249,8 @@ if ( RVM ) begin : RVM1 // Conditional systhesis!
     always @(posedge clk) begin : div_rem_process // Highly inspired by PicoRV32
     /*============================================================================*/
         if ( isDivide_ && !aluBusy ) begin // Patterson and Hennessy's algorithm
-            dividend <= ( ~opcode[12] & aluIn1[31] ) ? -aluIn1 : aluIn1;
-            divisor  <= {(( ~opcode[12] & aluIn2[31] ) ? -aluIn2 : aluIn2 ), 31'b0};
+            dividend <= ( ~instr[12] & aluIn1[31] ) ? -aluIn1 : aluIn1;
+            divisor  <= {(( ~instr[12] & aluIn2[31] ) ? -aluIn2 : aluIn2 ), 31'b0};
             quotient <= 0;
             quotient_msk <= 1 << 31;
         end else begin
@@ -259,20 +262,20 @@ if ( RVM ) begin : RVM1 // Conditional systhesis!
 
         aluBusy_ <= aluBusy;
         isDivide__ <= isDivide_ | aluBusy;
-        divResult <= opcode[13] ? dividendN : quotientN;
+        divResult <= instr[13] ? dividendN : quotientN;
     end // div_rem_process
 
     wire [31:0] aluOut_muldiv =
         (  funct3Is[0]   ? multiply[31:0]  : 32'b0 ) | // 0:MUL
         ( |funct3Is[3:1] ? multiply[63:32] : 32'b0 ) | // 1:MULH, 2:MULHSU, 3:MULHU
-        (  opcode[14]    ? ( div_sign ? -divResult : divResult ) : 32'b0 ); // 4:DIV, 5:DIVU, 6:REM, 7:REMU
+        (  instr[14]     ? ( div_sign ? -divResult : divResult ) : 32'b0 ); // 4:DIV, 5:DIVU, 6:REM, 7:REMU
 
     assign isDivide = isDivide_ | isDivide__;
     assign isMultiplyDelayed = DELAY_MULTIPLY & isALUregFuncM & ~isDivide_;
     assign aluBusy = |quotient_msk; // ALU is busy if division is in progress.
     assign aluOut = ( isALUregFuncM | isDivide__ ) ? aluOut_muldiv : aluOut_base;
 
-    wire sel_cyclesh = ( opcode[31:20] == 12'hC80 );
+    wire sel_cyclesh = ( instr[31:20] == 12'hC80 );
     assign CSR_read = sel_cyclesh ? cycles[63:32] : cycles[31:0];
 /*============================================================================*/
 end else begin : RVM0 // Conditional systhesis!
@@ -286,6 +289,74 @@ end
 /*============================================================================*/
 endgenerate
 
+wire [31:0] instr_d;
+reg  compressed = 0;
+
+generate
+/*============================================================================*/
+if ( RVC ) begin : RVC1 // Conditional systhesis!
+/*============================================================================*/
+    wire [15:0] c = pc_[1] ? rd_data[31:16] : rd_data[15:0];
+    reg  [31:0] d;
+
+    // Register decoder
+    wire [4:0] rcl = {2'b01, c[4:2]}; // Register compressed low
+    wire [4:0] rch = {2'b01, c[9:7]}; // Register compressed high
+    wire [4:0] rwl  = c[6:2];  // Register wide low
+    wire [4:0] rwh  = c[11:7]; // Register wide high
+
+    // Immediate decoder
+    wire  [4:0]    shiftImm = c[6:2];
+    wire [11:0] addi4spnImm = {2'b00, c[10:7], c[12:11], c[5], c[6], 2'b00};
+    wire [11:0]     lwswImm = {5'b00000, c[5], c[12:10] , c[6], 2'b00};
+    wire [11:0]     lwspImm = {4'b0000, c[3:2], c[12], c[6:4], 2'b00};
+    wire [11:0]     swspImm = {4'b0000, c[8:7], c[12:9], 2'b00};
+    wire [11:0] addi16spImm = {{ 3{c[12]}}, c[4:3], c[5], c[2], c[6], 4'b0000};
+    wire [11:0]      addImm = {{ 7{c[12]}}, c[6:2]};
+    wire [12:0]        bImm = {{ 5{c[12]}}, c[6:5], c[2], c[11:10], c[4:3], 1'b0};
+    wire [20:0]      jalImm = {{10{c[12]}}, c[8], c[10:9], c[6], c[7], c[2], c[11], c[5:3], 1'b0};
+    wire [31:0]      luiImm = {{15{c[12]}}, c[6:2], 12'b000000000000};
+
+    always @(*)
+    casez ( {pc_[1], c} )                     // imm/funct7,       rs2,  rs1,    fn3,                  rd,   opcode
+        17'b0???___????????_???_11 : d =                                                                        rd_data; // Long instr, no need to decompress
+        17'b?000___????????_???_00 : d = {      addi4spnImm,            5'd2, 3'b000,                 rcl, 7'b00100_11}; // c.addi4spn  -->  addi rd',x2,nzuimm[9:2]
+        17'b?010_???_???_??_???_00 : d = {          lwswImm,             rch, 3'b010,                 rcl, 7'b00000_11}; // c.lw        -->  lw   rd',offset[6:2](rs1')
+        17'b?110_???_???_??_???_00 : d = {    lwswImm[11:5],       rcl,  rch, 3'b010,        lwswImm[4:0], 7'b01000_11}; // c.sw        -->  sw   rs2',offset[6:2](rs1')
+        17'b?000_???_???_??_???_01 : d = {           addImm,             rwh, 3'b000,                 rwh, 7'b00100_11}; // c.addi      -->  addi rd,rd,nzimm[5:0]
+        17'b?001____???????????_01 : d = {     jalImm[20], jalImm[10:1] , jalImm[11], jalImm[19:12], 5'd1, 7'b11011_11}; // c.jal       -->  jal  x1,offset[11:1]
+        17'b?010__?_?????_?????_01 : d = {           addImm,            5'd0, 3'b000,                 rwh, 7'b00100_11}; // c.li        -->  addi rd,x0,imm[5:0]
+        17'b?011__?_00010_?????_01 : d = {      addi16spImm,             rwh, 3'b000,                 rwh, 7'b00100_11}; // c.addi16sp  -->  addi x2,x2,nzimm[9:4]
+        17'b?011__?_?????_?????_01 : d = {    luiImm[31:12],                                          rwh, 7'b01101_11}; // c.lui       -->  lui  rd,nzuimm[17:12]
+        17'b?100_?_00_???_?????_01 : d = {       7'b0000000,  shiftImm,  rch, 3'b101,                 rch, 7'b00100_11}; // c.srli      -->  srli rd',rd',shamt[5:0]
+        17'b?100_?_01_???_?????_01 : d = {       7'b0100000,  shiftImm,  rch, 3'b101,                 rch, 7'b00100_11}; // c.srai      -->  srai rd',rd',shamt[5:0]
+        17'b?100_?_10_???_?????_01 : d = {           addImm,             rch, 3'b111,                 rch, 7'b00100_11}; // c.andi      -->  andi rd',rd',imm[5:0]
+        17'b?100_011_???_00_???_01 : d = {       7'b0100000,       rcl,  rch, 3'b000,                 rch, 7'b01100_11}; // c.sub       -->  sub  rd',rd',rs2'
+        17'b?100_011_???_01_???_01 : d = {       7'b0000000,       rcl,  rch, 3'b100,                 rch, 7'b01100_11}; // c.xor       -->  xor  rd',rd',rs2'
+        17'b?100_011_???_10_???_01 : d = {       7'b0000000,       rcl,  rch, 3'b110,                 rch, 7'b01100_11}; // c.or        -->  or   rd',rd',rs2'
+        17'b?100_011_???_11_???_01 : d = {       7'b0000000,       rcl,  rch, 3'b111,                 rch, 7'b01100_11}; // c.and       -->  and  rd',rd',rs2'
+        17'b?101____???????????_01 : d = {     jalImm[20], jalImm[10:1] , jalImm[11], jalImm[19:12], 5'd0, 7'b11011_11}; // c.j         -->  jal  x0,offset[11:1]
+        17'b?110__???_???_?????_01 : d = {bImm[12], bImm[10:5],   5'd0,  rch, 3'b000, bImm[4:1], bImm[11], 7'b11000_11}; // c.beqz      -->  beq  rs1',x0,offset[8:1]
+        17'b?111__???_???_?????_01 : d = {bImm[12], bImm[10:5],   5'd0,  rch, 3'b001, bImm[4:1], bImm[11], 7'b11000_11}; // c.bnez      -->  bne  rs1',x0,offset[8:1]
+        17'b?000__?_?????_?????_10 : d = {        7'b0000000, shiftImm,  rwh, 3'b001,                 rwh, 7'b00100_11}; // c.slli      -->  slli rd,rd,shamt[5:0]
+        17'b?010__?_?????_?????_10 : d = {           lwspImm,           5'd2, 3'b010,                 rwh, 7'b00000_11}; // c.lwsp      -->  lw   rd,offset[7:2](x2)
+        17'b?100__0_?????_00000_10 : d = {  12'b000000000000,            rwh, 3'b000,                5'd0, 7'b11001_11}; // c.jr        -->  jalr x0,rs1,0
+        17'b?100__0_?????_?????_10 : d = {        7'b0000000,      rwl, 5'd0, 3'b000,                 rwh, 7'b01100_11}; // c.mv        -->  add  rd,x0,rs2
+        17'b?100__1_?????_00000_10 : d = {  12'b000000000000,            rwh, 3'b000,                5'd1, 7'b11001_11}; // c.jalr      -->  jalr x1,rs1,0
+        17'b?100__1_?????_?????_10 : d = {        7'b0000000,      rwl,  rwh, 3'b000,                 rwh, 7'b01100_11}; // c.add       -->  add  rd,rd,rs2
+        17'b?110__?_?????_?????_10 : d = {     swspImm[11:5],      rwl, 5'd2, 3'b010,        swspImm[4:0], 7'b01000_11}; // c.swsp      -->  sw   rs2,offset[7:2](x2)
+        default:                     d =                                                                              0; // Unsupported instruction
+    endcase
+
+    assign instr_d = d;
+/*============================================================================*/
+end else begin : RVC0 // Conditional systhesis!
+/*============================================================================*/
+    assign instr_d = rd_data;
+end
+/*============================================================================*/
+endgenerate
+
 // All memory accesses are aligned on 32 bits boundary. For this reason, we need
 // some circuitry that does unaligned halfword and byte load/store, based on:
 // - funct3[1:0]:  00->byte 01->halfword 10->word
@@ -294,16 +365,16 @@ reg  mem_byteAccess = 0;
 reg  mem_byteAccess_ = 0; // mem_byteAccess, one clock cycle delayed!
 reg  mem_halfwordAccess = 0;
 reg  mem_halfwordAccess_ = 0; // mem_halfwordAccess, one clock cycle delayed!
-reg  opcode_14_n = 0; // ~opcode[14], one clock cycle delayed!
+reg  instr_14_n = 0; // ~instr[14], one clock cycle delayed!
 
 // A separate adder to compute the destination of load/store.
 wire [AW-1:0] loadstore_addr = rs1[AW-1:0] + ( isStore ? Simm[AW-1:0] : Iimm[AW-1:0] );
 reg  [1:0] loadstore_addr_ = 0;
 
-// isLoad, in addition to funct3[1:0], depends on funct3[2] (opcode[14]): 0->do sign expansion   1->no sign expansion
+// isLoad, in addition to funct3[1:0], depends on funct3[2] (instr[14]): 0->do sign expansion   1->no sign expansion
 wire [15:0] load_halfword = loadstore_addr_[1] ? rd_data[31:16] : rd_data[15:0];
 wire [7:0] load_byte = loadstore_addr_[0] ? load_halfword[15:8] : load_halfword[7:0];
-wire load_sign = opcode_14_n & ( mem_byteAccess_ ? load_byte[7] : load_halfword[15] );
+wire load_sign = instr_14_n & ( mem_byteAccess_ ? load_byte[7] : load_halfword[15] );
 
 assign load_data =
         mem_byteAccess_ ? {{24{load_sign}},     load_byte} :
@@ -335,7 +406,7 @@ wire isJump = isJALR | jumpToPCplusImm;
 reg  isJump_ = 0; // isJump, one clock clycle delayed!
 
 wire [AW-1:0] PC_addr = isJALR ? {aluPlus[AW-1:1], 1'b0} : ( jumpToPCplusImm ? PCplusImm : PC );
-wire [AW-1:0] PC_next = PC_addr + {{(AW-3){1'b0}}, 3'd4}; // + 4
+wire [AW-1:0] PC_next = PC_addr + {{(AW-3){1'b0}}, ( compressed ? 3'd2 : 3'd4 )}; // + 2/4
 wire [31:0] dp_bram1_data_ao;
 
 assign addr = ( isLoad | isStore ) ? loadstore_addr[AW-1:0] : PC_addr; // Memory (I/O) address
@@ -360,7 +431,7 @@ wire fetch_decode = ~( hold | isDivide | isJump | isLoad_ | isStore_ | isMultipl
 always @(posedge clk) begin : execute
 /*============================================================================*/
     if ( !rst_n ) begin
-        isStore_ <= 1'b1; // Delay start of processing opcode one clock cycle!
+        isStore_ <= 1'b1; // Delay start of processing instr one clock cycle!
         PC <= PC_RESET[AW-1:0];
     end else begin
         isMultiplyDelayed_ <= isMultiplyDelayed;
@@ -368,9 +439,9 @@ always @(posedge clk) begin : execute
         mem_byteAccess_ <= mem_byteAccess;
         mem_halfwordAccess_ <= mem_halfwordAccess;
         // isLoad related flags and registers, one clock cycle delayed!
-        opcode_14_n <= ~opcode[14];
+        instr_14_n <= ~instr[14];
         loadstore_addr_ <= loadstore_addr[1:0];
-        rdId_ <= ( isLoad & isLoad_ ) ? opcode[11:7] : rdId; // Adjacent isLoad!
+        rdId_ <= ( isLoad & isLoad_ ) ? instr[11:7] : rdId; // Adjacent isLoad!
          // isLoad_ => dp_bram_data_ai = load_data, isStore__ => keep rdUpdate_!
         if ( !isStore__ ) rdUpdate_ <= ( ~isLoad & isLoad_ ) ? rdUpdate : dp_bram_data_ai;
         // Pulse (single clock clycle) flags for single clock cycle fetch_decode!
@@ -391,22 +462,23 @@ always @(posedge clk) begin : execute
         isSYSTEM <= 0;
 
         if ( fetch_decode )  begin
-            isLoad    <= ( rd_data[6:2] == 5'b00000 ); // rd <- mem[rs1Id+Iimm]
-            isALUimm  <= ( rd_data[6:2] == 5'b00100 ); // rd <- rs1Id OP Iimm
-            isAUIPC   <= ( rd_data[6:2] == 5'b00101 ); // rd <- PC + Uimm
-            isStore   <= ( rd_data[6:2] == 5'b01000 ); // rd <- mem[rs1Id+Iimm] <= rs2
-            isALUreg  <= ( rd_data[6:2] == 5'b01100 ); // rd <- rs1Id OP rs2Id
-            isLUI     <= ( rd_data[6:2] == 5'b01101 ); // rd <- Uimm
-            isBranch  <= ( rd_data[6:2] == 5'b11000 ); // if ( rs1Id OP rs2Id ) PC <- PC + Bimm
-            isJALR    <= ( rd_data[6:2] == 5'b11001 ); // rd <- PC + 4; PC <- rs1Id + Iimm
-            isJAL     <= ( rd_data[6:2] == 5'b11011 ); // rd <- PC + 4; PC <- PC + Jimm
-            isSYSTEM  <= ( rd_data[6:2] == 5'b11100 ); // rd <- cycles
-            funct3Is  <= 8'b00000001 << rd_data[14:12];
-            mem_byteAccess     <= ( rd_data[13:12] == 2'b00 ); // funct3[1:0] == 2'b00;
-            mem_halfwordAccess <= ( rd_data[13:12] == 2'b01 ); // funct3[1:0] == 2'b01;
-            eqId_rd_rs1 <= ( rdId == rd_data[19:15] ); // rdId_ == rs1Id
-            eqId_rd_rs2 <= ( rdId == rd_data[24:20] ); // rdId_ == rs2Id
-            opcode[31:2] <= rd_data[31:2]; // Bits 0 and 1 are ignored.
+            isLoad    <= ( instr_d[6:2] == 5'b00000 ); // rd <- mem[rs1Id+Iimm]
+            isALUimm  <= ( instr_d[6:2] == 5'b00100 ); // rd <- rs1Id OP Iimm
+            isAUIPC   <= ( instr_d[6:2] == 5'b00101 ); // rd <- PC + Uimm
+            isStore   <= ( instr_d[6:2] == 5'b01000 ); // rd <- mem[rs1Id+Iimm] <= rs2
+            isALUreg  <= ( instr_d[6:2] == 5'b01100 ); // rd <- rs1Id OP rs2Id
+            isLUI     <= ( instr_d[6:2] == 5'b01101 ); // rd <- Uimm
+            isBranch  <= ( instr_d[6:2] == 5'b11000 ); // if ( rs1Id OP rs2Id ) PC <- PC + Bimm
+            isJALR    <= ( instr_d[6:2] == 5'b11001 ); // rd <- PC + 4; PC <- rs1Id + Iimm
+            isJAL     <= ( instr_d[6:2] == 5'b11011 ); // rd <- PC + 4; PC <- PC + Jimm
+            isSYSTEM  <= ( instr_d[6:2] == 5'b11100 ); // rd <- cycles
+            funct3Is  <= 8'b00000001 << instr_d[14:12];
+            mem_byteAccess     <= ( instr_d[13:12] == 2'b00 ); // funct3[1:0] == 2'b00;
+            mem_halfwordAccess <= ( instr_d[13:12] == 2'b01 ); // funct3[1:0] == 2'b01;
+            eqId_rd_rs1 <= ( rdId == instr_d[19:15] ); // rdId_ == rs1Id
+            eqId_rd_rs2 <= ( rdId == instr_d[24:20] ); // rdId_ == rs2Id
+            instr[31:2] <= instr_d[31:2]; // Bits 0 and 1 are ignored.
+            compressed  <= RVC & ( pc_[1] ? ~&rd_data[17:16] : ~&rd_data[1:0] );
         end
 
         if ( zero_cs_ws && !hold ) begin
@@ -422,10 +494,10 @@ always @(posedge clk) begin : execute
             2'd3 : r0r31_set <= r0r31_sel; // Also store PC into R0
             // cs_ws = 2, dp_bram1_data_ao valid next clock cycle
             2'd1 : PC <= dp_bram1_data_ao[AW-1:0];
-            2'd0 : opcode[11:7] <= 0; // rdId = 0!
+            2'd0 : instr[11:7] <= 0; // rdId = 0!
             default :;
             endcase
-            isStore_ <= 1'b1; // Stop processing opcode!
+            isStore_ <= 1'b1; // Stop processing instr!
             cs_ws <= cs_ws - 1; // Wrap around 0 -> 3!
         end
     end
@@ -450,7 +522,7 @@ dp_bram1(
     .clk_b(clk),
     .en_b(rst_n),
     .we_b(1'b0), // Never write to BRAM B port!
-    .addr_b({r0r31_set, rd_data[19:15]}),
+    .addr_b({r0r31_set, instr_d[19:15]}),
     .data_bi(32'd0), // Tie to zero
     .data_bo(dp_bram1_data_bo)
     );
@@ -471,7 +543,7 @@ dp_bram2(
     .clk_b(clk),
     .en_b(rst_n),
     .we_b(1'b0), // Never write to BRAM B port!
-    .addr_b({r0r31_set, rd_data[24:20]}),
+    .addr_b({r0r31_set, instr_d[24:20]}),
     .data_bi(32'd0), // Tie to zero
     .data_bo(dp_bram2_data_bo)
     );

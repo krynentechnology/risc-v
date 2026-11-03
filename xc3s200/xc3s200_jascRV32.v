@@ -202,6 +202,7 @@ jascRV32 #(
     .PC_RESET(32'h00100000),
     .AW(AW),
     .RVM(0),
+    .RVC(0),
     .DELAY_MULTIPLY(0))
 riscv (
     .clk(clk),
