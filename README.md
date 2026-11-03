@@ -9,6 +9,8 @@
   <li>The AW parameter sets the internal address bus (and address computation logic).</li>
   <li>The RVM parameter adds multiply-divide instructions (RV32IM).</li>
   <li>When RVM = 1, the DELAY_MULTIPLY parameter delays the multiply operation with one clock cycle (if required to meet timing constraints).</li>
+  <li>RVIM instructions should be 32-bit aligned.</li>
+  <li>The RVC parameter adds compressed instructions support (16-bit aligned).</li>
   <li>In general, instructions take one clock cycle, except for instructions (two clock cycles) following branch/jump/load/store instructions (sets the cpu address bus) or multiple clock ALU operations (division).</li>
 </ul>
 <h3>FemtoRV32</h3>
