@@ -93,7 +93,6 @@ endfunction // swap32
 
 localparam AW = 21; // 1Mb memory and 1Mb I/O space.
 localparam RSTW = 4; // Reset delay shift width
-localparam PC_BITS = 12;
 localparam NR_BITS = 8;
 localparam RX_FIFO = 8;
 
